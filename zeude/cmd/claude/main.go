@@ -160,9 +160,11 @@ func showStartupBanner(syncResult mcpconfig.SyncResult) {
 	// Print welcome
 	fmt.Fprintf(os.Stderr, "%s[zeude]%s Ready! Hi %s%s%s%s\n", colorBlue, colorReset, colorGreen, userName, colorReset, versionStr)
 
-	// Show org-wide banner if configured
+	// Show org-wide banner if configured (supports multi-line)
 	if syncResult.Banner != "" {
-		fmt.Fprintf(os.Stderr, "%s[zeude]%s %s%s%s\n", colorBlue, colorReset, colorYellow, syncResult.Banner, colorReset)
+		for _, line := range strings.Split(syncResult.Banner, "\n") {
+			fmt.Fprintf(os.Stderr, "%s[zeude]%s %s%s%s\n", colorBlue, colorReset, colorYellow, line, colorReset)
+		}
 	}
 
 	// Show warning if agent key is not configured
