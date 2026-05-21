@@ -168,4 +168,7 @@ func injectTelemetryEnv(syncResult mcpconfig.SyncResult) {
 	if syncResult.Team != "" {
 		otelenv.InjectResourceAttribute("zeude.team", syncResult.Team)
 	}
+	if model := mcpconfig.GetCopilotModel(); model != "" {
+		otelenv.InjectResourceAttribute("ai.model.id", model)
+	}
 }

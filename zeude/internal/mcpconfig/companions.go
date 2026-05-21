@@ -152,6 +152,26 @@ func GetCurrentModel() string {
 	return ""
 }
 
+// GetCopilotModel reads the model from ~/.copilot/settings.json.
+// Returns empty string if not set.
+func GetCopilotModel() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".copilot", "settings.json"))
+	if err != nil {
+		return ""
+	}
+	var cfg struct {
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return ""
+	}
+	return cfg.Model
+}
+
 // GetOpencodeModel reads the first configured provider+model from opencode.json.
 // Returns "provider/model" or empty string.
 func GetOpencodeModel() string {
