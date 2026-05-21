@@ -1,44 +1,44 @@
-# Zeude Installation Guide
+# Zeude 설치 가이드
 
-Self-hosted installation guide for Zeude — Claude Code observability platform.
+Claude Code 옵저버빌리티 플랫폼 Zeude 자체 호스팅 설치 가이드입니다.
 
-## Architecture
+## 아키텍처
 
 ```
-Developer PC                    Server
+개발자 PC                        서버
 ─────────────                   ──────────────────────────────────
 claude (zeude shim)  ──OTEL──▶  OTel Collector :4318
                                        │
                                        ▼
-                               ClickHouse :8123 (analytics)
-                               PostgreSQL :5432  (config/users)
-                               Dashboard  :3000  (web UI)
+                               ClickHouse :8123 (분석 DB)
+                               PostgreSQL :5432  (설정/유저)
+                               Dashboard  :3000  (웹 UI)
 ```
 
 ---
 
-## Server Setup
+## 서버 설정
 
-### Prerequisites
+### 사전 준비
 
 - Docker & Docker Compose
 - Git
 - `openssl`, `python3`, `curl`
 
-### 1. Clone & Start
+### 1. 클론 & 실행
 
 ```bash
 git clone https://github.com/shclub/zeude.git
 cd zeude
 
-# Start all services (PostgreSQL, ClickHouse, OTel Collector, Dashboard)
+# 전체 서비스 실행 (PostgreSQL, ClickHouse, OTel Collector, Dashboard)
 docker compose -f docker-compose.mac.yaml up -d
 
-# Verify all containers are healthy
+# 컨테이너 상태 확인
 docker ps --filter "name=zeude"
 ```
 
-Expected output:
+정상 실행 시 출력:
 ```
 zeude-dashboard        Up (healthy)    0.0.0.0:3000->3000/tcp
 zeude-clickhouse       Up (healthy)    0.0.0.0:8123->8123/tcp
@@ -46,14 +46,14 @@ zeude-postgres         Up (healthy)    0.0.0.0:15432->5432/tcp
 zeude-otel-collector   Up              0.0.0.0:4317-4318->4317-4318/tcp
 ```
 
-### 2. Initialize ClickHouse Schema
+### 2. ClickHouse 스키마 초기화
 
 ```bash
-# Create zeude database
+# zeude DB 생성
 curl -s "http://localhost:8123/?user=default&password=dev" \
   --data "CREATE DATABASE IF NOT EXISTS zeude"
 
-# Apply schema
+# 스키마 적용
 python3 << 'EOF'
 import re, subprocess
 
@@ -75,18 +75,18 @@ for stmt in stmts:
         err += 1
     else:
         ok += 1
-print(f"Done: {ok} OK, {err} errors")
+print(f"완료: {ok} 성공, {err} 실패")
 EOF
 ```
 
-### 3. Create First Admin User
+### 3. 첫 번째 관리자 계정 생성
 
 ```bash
-# Generate agent key
+# agent key 생성
 AGENT_KEY="zd_$(openssl rand -hex 32)"
-echo "Save this agent key: $AGENT_KEY"
+echo "Agent Key: $AGENT_KEY"  # 반드시 저장해두세요
 
-# Insert admin user into PostgreSQL
+# PostgreSQL에 관리자 유저 추가
 docker exec zeude-postgres psql -U zeude -d zeude -c "
 INSERT INTO zeude_users (email, name, role, status, team, agent_key)
 VALUES ('your@email.com', 'Your Name', 'admin', 'active', 'default', '$AGENT_KEY')
@@ -95,14 +95,14 @@ RETURNING id, email, agent_key;
 "
 ```
 
-### 4. Build & Serve CLI Binaries
+### 4. CLI 바이너리 빌드 & 서빙
 
-The dashboard serves install scripts and CLI binaries from `/releases/`. Build them before restarting:
+대시보드가 `/releases/` 경로로 설치 스크립트와 바이너리를 제공합니다. Go 빌드 환경이 필요합니다.
 
 ```bash
 cd zeude
 
-# Build binaries for all platforms
+# 전체 플랫폼 바이너리 빌드
 for OS in darwin linux; do
   for ARCH in amd64 arm64; do
     echo -n "claude-$OS-$ARCH... "
@@ -112,60 +112,60 @@ for OS in darwin linux; do
   done
 done
 
-# Copy install.sh with your server URL
-SERVER_URL=http://<YOUR_SERVER_IP>:3000
-sed "s|https://your-dashboard-url|$SERVER_URL|g; s|https://your-otel-collector-url/|http://<YOUR_SERVER_IP>:4318/|g" \
+# 설치 스크립트를 서버 URL로 교체
+SERVER_URL=http://<서버IP>:3000
+sed "s|https://your-dashboard-url|$SERVER_URL|g; s|https://your-otel-collector-url/|http://<서버IP>:4318/|g" \
   releases/install.sh > dashboard/public/releases/install.sh
 
-# Rebuild dashboard image to include the binaries
+# 대시보드 이미지 재빌드 (바이너리 포함)
 cd ..
 docker compose -f docker-compose.mac.yaml build dashboard
 docker compose -f docker-compose.mac.yaml up -d dashboard
 ```
 
-### 5. Log In to Dashboard
+### 5. 대시보드 로그인
 
 ```bash
-SERVER_URL=http://<YOUR_SERVER_IP>:3000
+SERVER_URL=http://<서버IP>:3000
 
-# Get one-time login token (valid 60 seconds)
+# 일회용 로그인 토큰 발급 (60초 유효)
 OTT=$(curl -s -X POST "$SERVER_URL/api/auth/ott" \
   -H "Content-Type: application/json" \
   -d "{\"agentKey\": \"$AGENT_KEY\"}" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
-echo "Open in browser: $SERVER_URL/api/auth/callback?ott=$OTT"
+echo "브라우저에서 열기: $SERVER_URL/api/auth/callback?ott=$OTT"
 ```
 
-Open the URL in your browser to log in.
+출력된 URL을 브라우저에서 열면 자동 로그인됩니다.
 
 ---
 
-## Developer PC Setup
+## 개발자 PC 설정
 
-### Install zeude Plugin (per developer)
+### zeude 플러그인 설치 (개발자별 1회)
 
 ```bash
-# Replace with your server IP and agent key
-curl -fsSL http://<SERVER_IP>:3000/releases/install.sh | \
+# 서버 IP와 본인 agent key로 교체
+curl -fsSL http://<서버IP>:3000/releases/install.sh | \
   ZEUDE_AGENT_KEY=zd_your_agent_key \
-  ZEUDE_DASHBOARD_URL=http://<SERVER_IP>:3000 \
-  ZEUDE_ENDPOINT=http://<SERVER_IP>:4318/ \
+  ZEUDE_DASHBOARD_URL=http://<서버IP>:3000 \
+  ZEUDE_ENDPOINT=http://<서버IP>:4318/ \
   bash
 
-# Apply PATH changes
+# 셸 재시작
 source ~/.zshrc
 
-# Verify installation
-which claude     # should show: ~/.zeude/bin/claude
-zeude --version  # should print version
+# 설치 확인
+which claude     # → ~/.zeude/bin/claude 이어야 함
+zeude --version  # → 버전 출력
 ```
 
-### Enable Telemetry (if shim is bypassed by alias)
+### telemetry 환경변수 설정 (shim이 alias로 우회되는 경우)
 
 ```bash
 cat >> ~/.zshrc << 'EOF'
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://<SERVER_IP>:4318/
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://<서버IP>:4318/
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
@@ -174,44 +174,44 @@ EOF
 source ~/.zshrc
 ```
 
-### Open Dashboard from Claude Code
+### Claude Code에서 대시보드 열기
 
-In any Claude Code session:
+Claude Code 세션에서:
 ```
 /zeude
 ```
-This automatically opens the dashboard with a one-time login token.
+자동으로 로그인 토큰을 발급받아 브라우저에서 대시보드가 열립니다.
 
 ---
 
-## Verify Data Collection
+## 데이터 수집 확인
 
-After running Claude Code for a few minutes:
+Claude Code로 작업 후 몇 초 뒤에 확인:
 
 ```bash
-# Check if logs are arriving in ClickHouse
+# ClickHouse에 로그가 수집되는지 확인
 curl -s "http://localhost:8123/?user=default&password=dev&query=SELECT+count(*)+FROM+zeude.claude_code_logs"
 
-# Watch OTel collector for incoming data
+# OTel collector 실시간 수신 확인
 docker logs -f zeude-otel-collector 2>&1 | grep -E "export|LogsExported"
 ```
 
 ---
 
-## Port Reference
+## 포트 요약
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| Dashboard | 3000 | Web UI & API |
-| OTel Collector HTTP | 4318 | Telemetry ingestion from Claude Code |
-| OTel Collector gRPC | 4317 | Telemetry ingestion (gRPC) |
-| ClickHouse HTTP | 8123 | Analytics queries |
-| PostgreSQL | 15432 | Main database (host-exposed) |
+| 서비스 | 포트 | 용도 |
+|--------|------|------|
+| Dashboard | 3000 | 웹 UI / API |
+| OTel Collector HTTP | 4318 | Claude Code → 텔레메트리 수집 |
+| OTel Collector gRPC | 4317 | 텔레메트리 수집 (gRPC) |
+| ClickHouse HTTP | 8123 | 분석 쿼리 |
+| PostgreSQL | 15432 | 메인 DB (호스트 노출) |
 
 ---
 
-## Manage Users
+## 유저 관리
 
-Additional users can be added via the dashboard's Admin → Users page, or by generating invite links from Admin → Invites.
+추가 유저는 대시보드의 **Admin → Users** 페이지에서 등록하거나, **Admin → Invites**에서 초대 링크를 생성해 전달할 수 있습니다.
 
-Each developer needs their own `agent_key`. Keys are generated automatically when a user is created through the dashboard.
+각 개발자는 고유한 `agent_key`가 필요하며, 대시보드에서 유저 생성 시 자동으로 발급됩니다.
