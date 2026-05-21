@@ -22,7 +22,7 @@ services:
 
   # OTel Collector (receives telemetry from Claude Code)
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.115.0
+    image: otel/opentelemetry-collector-contrib:0.152.1
     ports:
       - "4317:4317"   # gRPC
       - "4318:4318"   # HTTP
