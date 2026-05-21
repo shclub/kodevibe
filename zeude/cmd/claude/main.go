@@ -210,6 +210,9 @@ func injectTelemetryEnv(syncResult mcpconfig.SyncResult) {
 	if syncResult.Team != "" {
 		otelenv.InjectResourceAttribute("zeude.team", syncResult.Team)
 	}
+	if model := mcpconfig.GetCurrentModel(); model != "" {
+		otelenv.InjectResourceAttribute("ai.model.id", model)
+	}
 }
 
 // installCompanionCodexShim auto-installs the codex shim if codex is in PATH

@@ -2032,6 +2032,7 @@ type SyncResult struct {
 	Team        string
 	Banner      string
 	Prefix      string
+	MCPServers  map[string]MCPServer
 	Success     bool
 	ServerCount int
 	SkillCount  int
@@ -2138,6 +2139,7 @@ func doSync(mode syncMode) SyncResult {
 		Team:        config.Team,
 		Banner:      config.Banner,
 		Prefix:      config.Prefix,
+		MCPServers:  config.MCPServers,
 		Success:     true,
 		ServerCount: len(config.MCPServers),
 		SkillCount:  len(config.Skills),
