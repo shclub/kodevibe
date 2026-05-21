@@ -169,9 +169,10 @@ type ConfigResponse struct {
 	SkillCount    int                  `json:"skillCount"`
 	HookCount     int                  `json:"hookCount"`
 	AgentCount    int                  `json:"agentCount"`
-	UserID        string               `json:"userId,omitempty"`    // Supabase UUID
+	UserID        string               `json:"userId,omitempty"`
 	UserEmail     string               `json:"userEmail,omitempty"`
 	Team          string               `json:"team,omitempty"`
+	Banner        string               `json:"banner,omitempty"`
 }
 
 // CachedConfig wraps ConfigResponse with cache metadata.
@@ -208,7 +209,8 @@ type UserInfoCache struct {
 	UserID       string    `json:"userId"`
 	UserEmail    string    `json:"userEmail"`
 	Team         string    `json:"team"`
-	AgentKeyHash string    `json:"agentKeyHash"` // SHA256 of agent key to detect key changes
+	Banner       string    `json:"banner"`
+	AgentKeyHash string    `json:"agentKeyHash"`
 	CachedAt     time.Time `json:"cachedAt"`
 }
 
@@ -244,6 +246,7 @@ func saveUserInfo(result SyncResult, agentKey string) error {
 		UserID:       result.UserID,
 		UserEmail:    result.UserEmail,
 		Team:         result.Team,
+		Banner:       result.Banner,
 		AgentKeyHash: hashAgentKey(agentKey),
 		CachedAt:     time.Now(),
 	}
@@ -318,6 +321,7 @@ func doFastSync(mode syncMode) (SyncResult, bool) {
 		UserID:    userInfo.UserID,
 		UserEmail: userInfo.UserEmail,
 		Team:      userInfo.Team,
+		Banner:    userInfo.Banner,
 		Success:   true,
 		FromCache: true,
 	}, true // needs background sync
@@ -2019,16 +2023,17 @@ func syncSkillRules(agentKey string) error {
 // SyncResult contains user information from the sync process.
 // Used to inject user attributes into OTEL telemetry and display status.
 type SyncResult struct {
-	UserID      string // Supabase UUID - used to match ClickHouse data with Supabase
+	UserID      string
 	UserEmail   string
 	Team        string
+	Banner      string
 	Success     bool
 	ServerCount int
 	SkillCount  int
 	HookCount   int
 	AgentCount  int
 	FromCache   bool
-	NoAgentKey  bool // True when agent key is not configured
+	NoAgentKey  bool
 }
 
 // Sync fetches and merges MCP configuration.
@@ -2126,6 +2131,7 @@ func doSync(mode syncMode) SyncResult {
 		UserID:      config.UserID,
 		UserEmail:   config.UserEmail,
 		Team:        config.Team,
+		Banner:      config.Banner,
 		Success:     true,
 		ServerCount: len(config.MCPServers),
 		SkillCount:  len(config.Skills),

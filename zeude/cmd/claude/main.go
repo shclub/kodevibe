@@ -160,6 +160,11 @@ func showStartupBanner(syncResult mcpconfig.SyncResult) {
 	// Print welcome
 	fmt.Fprintf(os.Stderr, "%s[zeude]%s Ready! Hi %s%s%s%s\n", colorBlue, colorReset, colorGreen, userName, colorReset, versionStr)
 
+	// Show org-wide banner if configured
+	if syncResult.Banner != "" {
+		fmt.Fprintf(os.Stderr, "%s[zeude]%s %s%s%s\n", colorBlue, colorReset, colorYellow, syncResult.Banner, colorReset)
+	}
+
 	// Show warning if agent key is not configured
 	if syncResult.NoAgentKey {
 		fmt.Fprintf(os.Stderr, "%s[zeude]%s %s⚠ Run: echo 'agent_key=YOUR_KEY' > ~/.zeude/credentials%s\n",

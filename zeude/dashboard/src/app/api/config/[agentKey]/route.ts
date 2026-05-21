@@ -86,9 +86,9 @@ export async function GET(
       return Response.json({ error: 'User account is inactive' }, { status: 403 })
     }
 
-    // Fetch MCP servers, skills, hooks, and agents in parallel for better performance
+    // Fetch MCP servers, skills, hooks, agents, and settings in parallel
     // DB-level filtering by team (is_global OR team membership) for efficiency
-    const [serversResult, skillsResult, hooksResult, agentsResult] = await Promise.all([
+    const [serversResult, skillsResult, hooksResult, agentsResult, settingsResult] = await Promise.all([
       supabase
         .from('zeude_mcp_servers')
         .select('id, name, url, command, args, env, is_global, teams')
@@ -109,12 +109,18 @@ export async function GET(
         .select('id, name, description, files, is_global, teams')
         .eq('status', 'active')
         .or(`is_global.eq.true,teams.cs.{"${user.team}"}`),
+      supabase
+        .from('zeude_settings')
+        .select('key, value')
+        .eq('key', 'banner')
+        .single(),
     ])
 
     const { data: servers, error: serversError } = serversResult
     const { data: skills, error: skillsError } = skillsResult
     const { data: hooks, error: hooksError } = hooksResult
     const { data: agents, error: agentsError } = agentsResult
+    const banner: string = settingsResult.data?.value || ''
 
     // Sort arrays by ID for deterministic hash generation
     // Without sorting, DB may return rows in different order causing hash mismatch
@@ -254,9 +260,10 @@ export async function GET(
       hookCount: hooksList?.length ?? null,
       agentCount: agentsList?.length ?? null,
       // User info for hook env var injection and OTEL telemetry
-      userId: user.id,  // Supabase UUID - used to match ClickHouse data with Supabase
+      userId: user.id,
       userEmail: user.email,
       team: user.team || 'default',
+      banner: banner || undefined,
     }, {
       headers: { 'ETag': rootHash },
     })

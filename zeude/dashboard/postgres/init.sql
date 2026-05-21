@@ -237,3 +237,14 @@ BEGIN
   RETURN result;
 END;
 $$ LANGUAGE plpgsql;
+
+-- ============================================================
+-- zeude_settings
+-- ============================================================
+CREATE TABLE IF NOT EXISTS zeude_settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO zeude_settings (key, value) VALUES ('banner', '') ON CONFLICT DO NOTHING;
