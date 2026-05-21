@@ -225,11 +225,12 @@ export async function GET(
     })) : null
 
     // Compute category-level hashes for efficient sync (Merkle-tree style)
+    // Banner is included in rootHash so changing it invalidates the ETag
     const mcpServersHash = stableHash(mcpServers)
     const skillsHash = stableHash(skillsList)
     const hooksHash = stableHash(hooksList)
     const agentsHash = stableHash(agentsList)
-    const rootHash = stableHash({ mcpServers: mcpServersHash, skills: skillsHash, hooks: hooksHash, agents: agentsHash })
+    const rootHash = stableHash({ mcpServers: mcpServersHash, skills: skillsHash, hooks: hooksHash, agents: agentsHash, banner })
 
     // Check If-None-Match header for conditional request (ETag support)
     const clientETag = req.headers.get('If-None-Match')
