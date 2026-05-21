@@ -46,7 +46,7 @@ func main() {
 	// Helper to print status
 	printInfo := func(info string) {
 		if interactive {
-			fmt.Fprintf(os.Stderr, "%s[zeude]%s %s%s%s\n", colorBlue, colorReset, colorGray, info, colorReset)
+			fmt.Fprintf(os.Stderr, "%s[kode:harness]%s %s%s%s\n", colorBlue, colorReset, colorGray, info, colorReset)
 		}
 	}
 
@@ -56,7 +56,7 @@ func main() {
 	// 2. Find real claude binary
 	realClaude, err := resolver.FindRealBinary()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "zeude: %v\n", err)
+		fmt.Fprintf(os.Stderr, "kode:harness: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -101,7 +101,7 @@ func main() {
 
 	// 7. Exec real claude (replaces this process - no PTY needed!)
 	if err := execBinary(realClaude, os.Args, os.Environ()); err != nil {
-		fmt.Fprintf(os.Stderr, "zeude: failed to exec claude: %v\n", err)
+		fmt.Fprintf(os.Stderr, "kode:harness: failed to exec claude: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -158,18 +158,18 @@ func showStartupBanner(syncResult mcpconfig.SyncResult) {
 	}
 
 	// Print welcome
-	fmt.Fprintf(os.Stderr, "%s[zeude]%s Ready! Hi %s%s%s%s\n", colorBlue, colorReset, colorGreen, userName, colorReset, versionStr)
+	fmt.Fprintf(os.Stderr, "%s[kode:harness]%s Ready! Hi %s%s%s%s\n", colorBlue, colorReset, colorGreen, userName, colorReset, versionStr)
 
 	// Show org-wide banner if configured (supports multi-line)
 	if syncResult.Banner != "" {
 		for _, line := range strings.Split(syncResult.Banner, "\n") {
-			fmt.Fprintf(os.Stderr, "%s[zeude]%s %s%s%s\n", colorBlue, colorReset, colorYellow, line, colorReset)
+			fmt.Fprintf(os.Stderr, "%s[kode:harness]%s %s%s%s\n", colorBlue, colorReset, colorYellow, line, colorReset)
 		}
 	}
 
 	// Show warning if agent key is not configured
 	if syncResult.NoAgentKey {
-		fmt.Fprintf(os.Stderr, "%s[zeude]%s %s⚠ Run: echo 'agent_key=YOUR_KEY' > ~/.zeude/credentials%s\n",
+		fmt.Fprintf(os.Stderr, "%s[kode:harness]%s %s⚠ Run: echo 'agent_key=YOUR_KEY' > ~/.zeude/credentials%s\n",
 			colorBlue, colorReset, colorYellow, colorReset)
 	}
 }
@@ -232,7 +232,7 @@ func installCompanionCodexShim() {
 	} else if isCorruptedCodexShim(home) {
 		// Codex shim exists but is corrupted (identical to claude binary)
 		needsInstall = true
-		fmt.Fprintf(os.Stderr, "[zeude:background] codex shim corrupted, repairing...\n")
+		fmt.Fprintf(os.Stderr, "[kode:harness:background] codex shim corrupted, repairing...\n")
 	}
 
 	if !needsInstall {
@@ -240,7 +240,7 @@ func installCompanionCodexShim() {
 	}
 
 	if err := autoupdate.InstallCompanionBinary("codex"); err != nil {
-		fmt.Fprintf(os.Stderr, "[zeude:background] codex companion install failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[kode:harness:background] codex companion install failed: %v\n", err)
 		return
 	}
 
