@@ -40,7 +40,8 @@ export async function fetchHooksData() {
     .select('user_id, hook_id, installed, version, last_checked_at')
 
   // Pre-compute maps for O(1) lookups
-  const userMap = new Map(users.map(u => [u.id, u]))
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userMap = new Map<string, any>(users.map(u => [u.id, u]))
   const installStatusArray = installStatus || []
   const statusByHookId = installStatusArray.reduce((acc, s) => {
     if (!acc[s.hook_id]) acc[s.hook_id] = []

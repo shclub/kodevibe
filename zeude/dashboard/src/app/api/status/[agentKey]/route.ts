@@ -105,7 +105,7 @@ export async function POST(
 
     // Upsert MCP install status records
     const now = new Date().toISOString()
-    const mcpUpsertData = []
+    const mcpUpsertData: Record<string, unknown>[] = []
 
     if (body.installStatus && Array.isArray(body.installStatus)) {
       for (const item of body.installStatus) {
@@ -139,7 +139,7 @@ export async function POST(
     }
 
     // Upsert Hook install status records
-    const hookUpsertData = []
+    const hookUpsertData: Record<string, unknown>[] = []
 
     if (body.hookInstallStatus && Array.isArray(body.hookInstallStatus)) {
       for (const item of body.hookInstallStatus) {

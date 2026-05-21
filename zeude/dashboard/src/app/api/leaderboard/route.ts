@@ -529,9 +529,9 @@ async function resolveCohortFilter(
     }
   }
 
-  const userEmails = Array.from(new Set((users || []).map(row => row.email).filter(Boolean)))
+  const userEmails: string[] = Array.from(new Set((users || []).map(row => row.email).filter(Boolean)))
   // After migration 011, MV user_id = Supabase UUID — use directly, no ClickHouse bridge needed
-  const zeudeIds = Array.from(new Set((users || []).map(row => row.id).filter(Boolean)))
+  const zeudeIds: string[] = Array.from(new Set((users || []).map(row => row.id).filter(Boolean)))
 
   return {
     cohortKey,

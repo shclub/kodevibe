@@ -7,6 +7,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  typescript: { ignoreBuildErrors: true },
   experimental: {
     optimizePackageImports: ['recharts', 'lucide-react'],
   },

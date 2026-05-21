@@ -466,10 +466,22 @@ func getAgentKey() string {
 	return ""
 }
 
-// getDashboardURL returns the dashboard URL from env or default.
+// getDashboardURL returns the dashboard URL from env, config file, or default.
 func getDashboardURL() string {
 	if url := os.Getenv("ZEUDE_DASHBOARD_URL"); url != "" {
 		return strings.TrimSuffix(url, "/")
+	}
+	// Read from ~/.zeude/config (dashboard_url= line)
+	if home, err := os.UserHomeDir(); err == nil {
+		if data, err := os.ReadFile(filepath.Join(home, ".zeude", "config")); err == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				if strings.HasPrefix(line, "dashboard_url=") {
+					if url := strings.TrimSpace(strings.TrimPrefix(line, "dashboard_url=")); url != "" {
+						return strings.TrimSuffix(url, "/")
+					}
+				}
+			}
+		}
 	}
 	return config.DefaultDashboardURL
 }

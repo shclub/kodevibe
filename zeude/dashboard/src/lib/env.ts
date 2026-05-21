@@ -3,10 +3,12 @@ import { z } from 'zod'
 const isProduction = process.env.NODE_ENV === 'production'
 
 const envSchema = z.object({
-  // Supabase — strict in production, optional in development (SKIP_AUTH=true bypasses auth)
-  SUPABASE_URL: isProduction ? z.string().url('SUPABASE_URL must be a valid URL') : z.string().optional().default(''),
-  SUPABASE_ANON_KEY: isProduction ? z.string().min(1, 'SUPABASE_ANON_KEY is required') : z.string().optional().default(''),
-  SUPABASE_SERVICE_ROLE_KEY: isProduction ? z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required') : z.string().optional().default(''),
+  // PostgreSQL
+  POSTGRES_HOST:     z.string().optional().default('localhost'),
+  POSTGRES_PORT:     z.string().optional().default('5432'),
+  POSTGRES_USER:     z.string().optional().default('zeude'),
+  POSTGRES_PASSWORD: isProduction ? z.string().min(1, 'POSTGRES_PASSWORD is required') : z.string().optional().default('zeude'),
+  POSTGRES_DB:       z.string().optional().default('zeude'),
 
   // ClickHouse
   CLICKHOUSE_URL: z.string().url().optional().default('http://localhost:8123'),

@@ -6,6 +6,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Dummy env vars for build-time validation (real values injected at runtime)
+ENV POSTGRES_PASSWORD=build-placeholder \
+    CLICKHOUSE_PASSWORD=build-placeholder
+
 # Install dependencies
 COPY package*.json ./
 RUN npm ci

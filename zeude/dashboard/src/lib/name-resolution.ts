@@ -1,5 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
-
 export interface UserRow {
   user_id: string
   user_email?: string | null
@@ -22,7 +20,8 @@ export interface NameResolutionResult {
  * Degradation chain: Supabase name → email → userId → 'Unknown'
  */
 export async function resolveUserNames(
-  supabase: SupabaseClient,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: { from: (table: string) => any },
   rows: UserRow[]
 ): Promise<NameResolutionResult> {
   const userIdToName = new Map<string, string>()

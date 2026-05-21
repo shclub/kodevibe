@@ -3,23 +3,16 @@
  * Run with: npx tsx scripts/backfill-skill-rules.ts
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '../src/lib/pg-client'
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY!
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
-  process.exit(1)
-}
 
 if (!OPENROUTER_API_KEY) {
   console.error('Missing OPENROUTER_API_KEY')
   process.exit(1)
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+const supabase = createServerClient()
 
 // Check if skill has allowed-tools (making it a command)
 function hasAllowedTools(content: string): boolean {
@@ -107,7 +100,7 @@ async function main() {
     .select('id, name, slug, description, content, keywords, hint, is_command')
     .eq('status', 'active')
 
-  if (error) {
+  if (error || !skills) {
     console.error('Failed to fetch skills:', error)
     process.exit(1)
   }
