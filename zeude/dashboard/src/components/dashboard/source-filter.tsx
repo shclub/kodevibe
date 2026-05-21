@@ -3,12 +3,14 @@
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback } from 'react'
 
-export type SourceFilterValue = 'all' | 'claude' | 'codex'
+export type SourceFilterValue = 'all' | 'claude' | 'codex' | 'copilot' | 'opencode'
 
 const SOURCE_OPTIONS: { value: SourceFilterValue; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'claude', label: 'Claude Code' },
   { value: 'codex', label: 'Codex' },
+  { value: 'copilot', label: 'Copilot' },
+  { value: 'opencode', label: 'OpenCode' },
 ]
 
 interface SourceFilterProps {
@@ -46,12 +48,12 @@ export function SourceFilter(props: SourceFilterProps) {
 function SourceFilterSkeleton() {
   return (
     <div className="flex border rounded-lg">
-      {SOURCE_OPTIONS.map((option) => (
+      {SOURCE_OPTIONS.map((option, i) => (
         <div
           key={option.value}
           className={`px-3 py-1.5 text-sm text-muted-foreground ${
-            option.value === 'all' ? 'rounded-l-lg bg-muted' : ''
-          } ${option.value === 'codex' ? 'rounded-r-lg' : ''}`}
+            i === 0 ? 'rounded-l-lg bg-muted' : ''
+          } ${i === SOURCE_OPTIONS.length - 1 ? 'rounded-r-lg' : ''}`}
         >
           {option.label}
         </div>
@@ -92,7 +94,7 @@ function SourceFilterInner({
 
   return (
     <div className={`flex border rounded-lg ${className}`}>
-      {SOURCE_OPTIONS.map((option) => (
+      {SOURCE_OPTIONS.map((option, i) => (
         <button
           key={option.value}
           onClick={() => handleChange(option.value)}
@@ -100,8 +102,8 @@ function SourceFilterInner({
             currentValue === option.value
               ? 'bg-blue-600 text-white'
               : 'hover:bg-muted'
-          } ${option.value === 'all' ? 'rounded-l-lg' : ''} ${
-            option.value === 'codex' ? 'rounded-r-lg' : ''
+          } ${i === 0 ? 'rounded-l-lg' : ''} ${
+            i === SOURCE_OPTIONS.length - 1 ? 'rounded-r-lg' : ''
           }`}
         >
           {option.label}

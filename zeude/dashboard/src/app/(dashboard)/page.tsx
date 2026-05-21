@@ -39,7 +39,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
         <div>
           <h1 className="text-3xl font-bold">Overview</h1>
           <p className="text-muted-foreground">
-            Your AI coding tool usage for today (Claude Code &amp; Codex)
+            Your AI coding tool usage for today
           </p>
         </div>
         <SourceFilterComponent useSearchParams />

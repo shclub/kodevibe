@@ -12,6 +12,7 @@ import (
 	"github.com/zeude/zeude/internal/config"
 	"github.com/zeude/zeude/internal/mcpconfig"
 	"github.com/zeude/zeude/internal/otelenv"
+	"github.com/zeude/zeude/internal/otlplog"
 	"github.com/zeude/zeude/internal/resolver"
 )
 
@@ -90,12 +91,26 @@ func main() {
 	// 6. Inject OTel env vars
 	injectTelemetryEnv(syncResult)
 
-	// 7. Background sync
+	// 7. Send session_start telemetry (fire-and-forget — opencode doesn't emit OTel natively)
+	model := getModelFromArgs()
+	if model == "" {
+		model = mcpconfig.GetOpencodeModel()
+	}
+	otlplog.SendSessionStart(otlplog.SessionStartParams{
+		Endpoint:  config.GetCollectorEndpoint(config.DefaultCollectorEndpoint),
+		Service:   "opencode",
+		UserID:    syncResult.UserID,
+		UserEmail: syncResult.UserEmail,
+		Team:      syncResult.Team,
+		Model:     model,
+	})
+
+	// 8. Background sync
 	if needsBackgroundSync {
 		mcpconfig.BackgroundSync()
 	}
 
-	// 8. Exec real opencode
+	// 9. Exec real opencode
 	if err := execBinary(realOpencode, os.Args, os.Environ()); err != nil {
 		fmt.Fprintf(os.Stderr, "[%s] failed to exec opencode: %v\n", prefix, err)
 		os.Exit(1)
@@ -175,6 +190,20 @@ func injectTelemetryEnv(syncResult mcpconfig.SyncResult) {
 	if model := mcpconfig.GetOpencodeModel(); model != "" {
 		otelenv.InjectResourceAttribute("ai.model.id", model)
 	}
+}
+
+// getModelFromArgs extracts the model name from --model or -m CLI args.
+func getModelFromArgs() string {
+	args := os.Args[1:]
+	for i, arg := range args {
+		if strings.HasPrefix(arg, "--model=") {
+			return strings.TrimPrefix(arg, "--model=")
+		}
+		if (arg == "--model" || arg == "-m") && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
 }
 
 // findRealOpencode looks for opencode: first in ~/.opencode/bin/, then PATH.

@@ -57,8 +57,8 @@ export interface DailyStats {
   output_tokens: number
 }
 
-// Source filter type for Claude Code vs Codex filtering
-export type SourceFilter = 'all' | 'claude' | 'codex'
+// Source filter type for all supported AI coding tools
+export type SourceFilter = 'all' | 'claude' | 'codex' | 'copilot' | 'opencode'
 
 // Query helpers
 // Note: OTel schema uses Timestamp (capital), LogAttributes map with dot notation (user.email, session.id)
@@ -73,26 +73,34 @@ const USER_MATCH_CONDITION = `(
 )`
 
 // Helper to build source filter condition for claude_code_logs (raw log table).
-// Uses ServiceName column: Codex services always start with 'codex' prefix
-// (e.g. 'codex', 'codex_cli_rs'). Everything else is treated as 'claude'.
+// Uses ServiceName to identify the tool. Everything not matching a known tool is 'claude'.
 function buildSourceCondition(source: SourceFilter): string {
-  if (source === 'claude') return "AND NOT (ServiceName ILIKE 'codex%')"
+  if (source === 'claude') return "AND NOT (ServiceName ILIKE 'codex%' OR ServiceName ILIKE 'copilot%' OR ServiceName ILIKE 'opencode%')"
   if (source === 'codex') return "AND ServiceName ILIKE 'codex%'"
+  if (source === 'copilot') return "AND ServiceName ILIKE 'copilot%'"
+  if (source === 'opencode') return "AND ServiceName ILIKE 'opencode%'"
   return '' // 'all' = no filter
 }
 
-// Helper to build source filter condition for materialized views (token_usage_hourly, etc.).
+// Helper to build source filter condition for materialized views (token_usage_hourly, tool_invocations_daily, etc.).
 // Uses the pre-computed 'source' column (not ServiceName).
 export function buildMVSourceCondition(source: SourceFilter): string {
   if (source === 'claude') return "AND source = 'claude'"
   if (source === 'codex') return "AND source = 'codex'"
+  if (source === 'copilot') return "AND source = 'copilot'"
+  if (source === 'opencode') return "AND source = 'opencode'"
   return '' // 'all' = no filter
 }
 
 // Validate and sanitize source parameter from URL search params.
 export function parseSourceParam(value: string | null): SourceFilter {
-  if (value === 'claude' || value === 'codex') return value
+  if (value === 'claude' || value === 'codex' || value === 'copilot' || value === 'opencode') return value
   return 'all'
+}
+
+// Returns true for sources that send session_start logs but no token data.
+export function isInvocationOnlySource(source: SourceFilter): boolean {
+  return source === 'copilot' || source === 'opencode'
 }
 
 // Escape a string value for safe interpolation in ClickHouse SQL.
@@ -242,6 +250,52 @@ async function _getOverviewStats(userEmail: string, userId: string = '', source:
 export function getOverviewStats(userEmail: string, userId: string = '', source: SourceFilter = 'all'): Promise<OverviewStats> {
   const cacheKey = ['overview-stats', userEmail, userId, source]
   return unstable_cache(_getOverviewStats, cacheKey, { revalidate: 30 })(userEmail, userId, source)
+}
+
+// Daily invocation stats from tool_invocations_daily MV (copilot/opencode).
+// Groups by date and model_id so callers can build model breakdowns.
+export interface DailyInvocation {
+  date: string
+  model_id: string
+  source: string
+  invocation_count: number
+}
+
+async function _getDailyInvocations(
+  userEmail: string,
+  userId: string = '',
+  days: number = 30,
+  source: SourceFilter = 'all'
+): Promise<DailyInvocation[]> {
+  const sourceCondition = buildMVSourceCondition(source)
+  const result = await clickhouse.query({
+    query: `
+      SELECT
+        date,
+        model_id,
+        source,
+        sum(invocation_count) as invocation_count
+      FROM tool_invocations_daily
+      WHERE (user_id = {userId:String} OR user_email = {userEmail:String})
+        AND date >= today() - {days:Int32}
+        ${sourceCondition}
+      GROUP BY date, model_id, source
+      ORDER BY date DESC, invocation_count DESC
+    `,
+    query_params: { userEmail, userId, days },
+    format: 'JSONEachRow',
+  })
+  return result.json()
+}
+
+export function getDailyInvocations(
+  userEmail: string,
+  userId: string = '',
+  days: number = 30,
+  source: SourceFilter = 'all'
+): Promise<DailyInvocation[]> {
+  const cacheKey = ['daily-invocations', userEmail, userId, String(days), source]
+  return unstable_cache(_getDailyInvocations, cacheKey, { revalidate: 60 })(userEmail, userId, days, source)
 }
 
 export async function getSessionDetails(userEmail: string, userId: string, sessionId: string) {

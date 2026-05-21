@@ -64,18 +64,22 @@ const SourceSummaryComparison = lazy(() => import('@/components/charts/source-co
 const SourceUserComparison = lazy(() => import('@/components/charts/source-user-comparison').then(m => ({ default: m.SourceUserComparison })))
 
 type Period = '7d' | '30d' | '90d'
-type SourceFilter = 'all' | 'claude' | 'codex'
+type SourceFilter = 'all' | 'claude' | 'codex' | 'copilot' | 'opencode'
 type SortField = 'userName' | 'cacheHitRate' | 'contextGrowthRate' | 'retryDensity' | 'avgInputPerRequest' | 'efficiencyScore'
 
 const SOURCE_DOT_COLORS: Record<string, string> = {
   claude: 'bg-blue-500',
   codex: 'bg-emerald-500',
+  copilot: 'bg-purple-500',
+  opencode: 'bg-orange-500',
 }
 const SOURCE_DOT_COLORS_DEFAULT = 'bg-gray-400'
 
 const SOURCE_LABELS: Record<string, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
+  copilot: 'Copilot',
+  opencode: 'OpenCode',
 }
 
 const TOOL_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
@@ -257,16 +261,16 @@ export default function AnalyticsClient() {
             Compare
           </button>
           <div className="flex border rounded-lg">
-            {(['all', 'claude', 'codex'] as SourceFilter[]).map((s) => (
+            {(['all', 'claude', 'codex', 'copilot', 'opencode'] as SourceFilter[]).map((s, i, arr) => (
               <button
                 key={s}
                 onClick={() => setSource(s)}
                 className={`px-3 py-1.5 text-sm transition-colors ${source === s
                   ? 'bg-blue-600 text-white'
                   : 'hover:bg-muted'
-                  }`}
+                  } ${i === 0 ? 'rounded-l-lg' : ''} ${i === arr.length - 1 ? 'rounded-r-lg' : ''}`}
               >
-                {s === 'all' ? 'All Sources' : s === 'claude' ? 'Claude Code' : 'Codex'}
+                {s === 'all' ? 'All Sources' : SOURCE_LABELS[s] ?? s}
               </button>
             ))}
           </div>

@@ -140,6 +140,8 @@ AS SELECT
        ResourceAttributes['zeude.user.id'],
        LogAttributes['user.id']) as user_id,
     multiIf(
+        ServiceName ILIKE '%copilot%', 'copilot',
+        ServiceName ILIKE '%opencode%', 'opencode',
         ServiceName ILIKE '%codex%', 'codex',
         'claude'
     ) as source,
@@ -223,7 +225,39 @@ GROUP BY user_id, source, date;
 
 
 -- ================================================
--- 5. Retry Analysis (View)
+-- 5. Tool Invocations Daily (Materialized View)
+-- Captures session_start events from all shims (copilot, opencode, codex, claude).
+-- This is the primary data source for copilot/opencode since they don't emit
+-- token data natively — the zeude shim sends a session_start log before exec.
+-- ================================================
+CREATE MATERIALIZED VIEW IF NOT EXISTS tool_invocations_daily
+ENGINE = SummingMergeTree()
+ORDER BY (org_id, user_id, source, model_id, date)
+TTL toDateTime(date) + INTERVAL 90 DAY DELETE
+SETTINGS index_granularity = 8192
+AS SELECT
+    LogAttributes['organization.id'] as org_id,
+    if(ResourceAttributes['zeude.user.id'] != '',
+       ResourceAttributes['zeude.user.id'],
+       LogAttributes['user.id']) as user_id,
+    multiIf(
+        ServiceName ILIKE '%copilot%', 'copilot',
+        ServiceName ILIKE '%opencode%', 'opencode',
+        ServiceName ILIKE '%codex%', 'codex',
+        'claude'
+    ) as source,
+    anyIf(ResourceAttributes['zeude.user.email'], ResourceAttributes['zeude.user.email'] != '') as user_email,
+    if(LogAttributes['model'] != '', LogAttributes['model'],
+       ResourceAttributes['ai.model.id']) as model_id,
+    toDate(Timestamp) as date,
+    count() as invocation_count
+FROM claude_code_logs
+WHERE Body = 'session_start'
+GROUP BY org_id, user_id, source, model_id, date;
+
+
+-- ================================================
+-- 6. Retry Analysis (View)
 -- Identifies potential retries based on timing patterns
 -- ================================================
 CREATE VIEW IF NOT EXISTS retry_analysis AS
