@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/zeude/zeude/internal/autoupdate"
 	"github.com/zeude/zeude/internal/config"
@@ -82,6 +83,7 @@ func main() {
 	// 5. Welcome message
 	if interactive {
 		showStartupBanner(syncResult, prefix)
+		time.Sleep(400 * time.Millisecond)
 	}
 
 	// 6. Inject OTel env vars
