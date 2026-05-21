@@ -33,7 +33,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	interactive := isInteractive()
+	// opencode is always a user-facing TUI tool — show banner unless it's a
+	// non-interactive flag (help/version) or a scripted invocation (no stderr tty).
+	showBanner := !isHelpOrVersionFlag() && isStderrTTY()
 
 	// 1. Fast sync (uses cached user info)
 	syncResult, needsBackgroundSync := mcpconfig.FastSync()
@@ -44,7 +46,7 @@ func main() {
 	}
 
 	printInfo := func(info string) {
-		if interactive {
+		if showBanner {
 			fmt.Fprintf(os.Stderr, "%s[%s]%s %s%s%s\n", colorBlue, prefix, colorReset, colorGray, info, colorReset)
 		}
 	}
@@ -84,8 +86,8 @@ func main() {
 		printInfo(strings.Join(statusParts, ", "))
 	}
 
-	// 5. Welcome message
-	if interactive {
+	// 5. Welcome message + pause so the banner is visible before the TUI takes over
+	if showBanner {
 		showStartupBanner(syncResult, prefix)
 		time.Sleep(400 * time.Millisecond)
 	}
@@ -128,20 +130,23 @@ func isBackgroundSyncMode() bool {
 	return false
 }
 
-func isInteractive() bool {
-	stat, err := os.Stdin.Stat()
+// isStderrTTY reports whether stderr is connected to a real terminal.
+func isStderrTTY() bool {
+	stat, err := os.Stderr.Stat()
 	if err != nil {
 		return false
 	}
-	if (stat.Mode() & os.ModeCharDevice) == 0 {
-		return false
-	}
+	return (stat.Mode() & os.ModeCharDevice) != 0
+}
+
+// isHelpOrVersionFlag reports whether the user passed a non-interactive flag.
+func isHelpOrVersionFlag() bool {
 	for _, arg := range os.Args[1:] {
 		if arg == "-h" || arg == "--help" || arg == "--version" || arg == "-v" {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func showStartupBanner(syncResult mcpconfig.SyncResult, prefix string) {
