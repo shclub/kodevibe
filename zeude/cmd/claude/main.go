@@ -43,20 +43,25 @@ func main() {
 	// Check if running interactively (show progress only in interactive mode)
 	interactive := isInteractive()
 
+	// 1. Fast sync: use cached user info (no network), or fall back to full sync on first run
+	syncResult, needsBackgroundSync := mcpconfig.FastSync()
+
+	prefix := syncResult.Prefix
+	if prefix == "" {
+		prefix = "zeude"
+	}
+
 	// Helper to print status
 	printInfo := func(info string) {
 		if interactive {
-			fmt.Fprintf(os.Stderr, "%s[kode:harness]%s %s%s%s\n", colorBlue, colorReset, colorGray, info, colorReset)
+			fmt.Fprintf(os.Stderr, "%s[%s]%s %s%s%s\n", colorBlue, prefix, colorReset, colorGray, info, colorReset)
 		}
 	}
-
-	// 1. Fast sync: use cached user info (no network), or fall back to full sync on first run
-	syncResult, needsBackgroundSync := mcpconfig.FastSync()
 
 	// 2. Find real claude binary
 	realClaude, err := resolver.FindRealBinary()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "kode:harness: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[%s] %v\n", prefix, err)
 		os.Exit(1)
 	}
 
@@ -88,7 +93,7 @@ func main() {
 
 	// 4. Show welcome message
 	if interactive {
-		showStartupBanner(syncResult)
+		showStartupBanner(syncResult, prefix)
 	}
 
 	// 5. Inject telemetry environment variables (only if not already set)
@@ -101,7 +106,7 @@ func main() {
 
 	// 7. Exec real claude (replaces this process - no PTY needed!)
 	if err := execBinary(realClaude, os.Args, os.Environ()); err != nil {
-		fmt.Fprintf(os.Stderr, "kode:harness: failed to exec claude: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[%s] failed to exec claude: %v\n", prefix, err)
 		os.Exit(1)
 	}
 }
@@ -140,7 +145,7 @@ func isInteractive() bool {
 
 
 // showStartupBanner displays a welcome message
-func showStartupBanner(syncResult mcpconfig.SyncResult) {
+func showStartupBanner(syncResult mcpconfig.SyncResult, prefix string) {
 	// Extract username from email (part before @)
 	userName := "there"
 	if syncResult.UserEmail != "" {
@@ -158,19 +163,19 @@ func showStartupBanner(syncResult mcpconfig.SyncResult) {
 	}
 
 	// Print welcome
-	fmt.Fprintf(os.Stderr, "%s[kode:harness]%s Ready! Hi %s%s%s%s\n", colorBlue, colorReset, colorGreen, userName, colorReset, versionStr)
+	fmt.Fprintf(os.Stderr, "%s[%s]%s Ready! Hi %s%s%s%s\n", colorBlue, prefix, colorReset, colorGreen, userName, colorReset, versionStr)
 
 	// Show org-wide banner if configured (supports multi-line)
 	if syncResult.Banner != "" {
 		for _, line := range strings.Split(syncResult.Banner, "\n") {
-			fmt.Fprintf(os.Stderr, "%s[kode:harness]%s %s%s%s\n", colorBlue, colorReset, colorYellow, line, colorReset)
+			fmt.Fprintf(os.Stderr, "%s[%s]%s %s%s%s\n", colorBlue, prefix, colorReset, colorYellow, line, colorReset)
 		}
 	}
 
 	// Show warning if agent key is not configured
 	if syncResult.NoAgentKey {
-		fmt.Fprintf(os.Stderr, "%s[kode:harness]%s %s⚠ Run: echo 'agent_key=YOUR_KEY' > ~/.zeude/credentials%s\n",
-			colorBlue, colorReset, colorYellow, colorReset)
+		fmt.Fprintf(os.Stderr, "%s[%s]%s %s⚠ Run: echo 'agent_key=YOUR_KEY' > ~/.zeude/credentials%s\n",
+			colorBlue, prefix, colorReset, colorYellow, colorReset)
 	}
 }
 
@@ -232,7 +237,7 @@ func installCompanionCodexShim() {
 	} else if isCorruptedCodexShim(home) {
 		// Codex shim exists but is corrupted (identical to claude binary)
 		needsInstall = true
-		fmt.Fprintf(os.Stderr, "[kode:harness:background] codex shim corrupted, repairing...\n")
+		fmt.Fprintf(os.Stderr, "[zeude:background] codex shim corrupted, repairing...\n")
 	}
 
 	if !needsInstall {
@@ -240,7 +245,7 @@ func installCompanionCodexShim() {
 	}
 
 	if err := autoupdate.InstallCompanionBinary("codex"); err != nil {
-		fmt.Fprintf(os.Stderr, "[kode:harness:background] codex companion install failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[zeude:background] codex companion install failed: %v\n", err)
 		return
 	}
 

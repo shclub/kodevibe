@@ -248,3 +248,4 @@ CREATE TABLE IF NOT EXISTS zeude_settings (
 );
 
 INSERT INTO zeude_settings (key, value) VALUES ('banner', '') ON CONFLICT DO NOTHING;
+INSERT INTO zeude_settings (key, value) VALUES ('prefix', 'zeude') ON CONFLICT DO NOTHING;

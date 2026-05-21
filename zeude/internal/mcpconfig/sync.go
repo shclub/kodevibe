@@ -173,6 +173,7 @@ type ConfigResponse struct {
 	UserEmail     string               `json:"userEmail,omitempty"`
 	Team          string               `json:"team,omitempty"`
 	Banner        string               `json:"banner,omitempty"`
+	Prefix        string               `json:"prefix,omitempty"`
 }
 
 // CachedConfig wraps ConfigResponse with cache metadata.
@@ -210,6 +211,7 @@ type UserInfoCache struct {
 	UserEmail    string    `json:"userEmail"`
 	Team         string    `json:"team"`
 	Banner       string    `json:"banner"`
+	Prefix       string    `json:"prefix"`
 	AgentKeyHash string    `json:"agentKeyHash"`
 	CachedAt     time.Time `json:"cachedAt"`
 }
@@ -247,6 +249,7 @@ func saveUserInfo(result SyncResult, agentKey string) error {
 		UserEmail:    result.UserEmail,
 		Team:         result.Team,
 		Banner:       result.Banner,
+		Prefix:       result.Prefix,
 		AgentKeyHash: hashAgentKey(agentKey),
 		CachedAt:     time.Now(),
 	}
@@ -322,6 +325,7 @@ func doFastSync(mode syncMode) (SyncResult, bool) {
 		UserEmail: userInfo.UserEmail,
 		Team:      userInfo.Team,
 		Banner:    userInfo.Banner,
+		Prefix:    userInfo.Prefix,
 		Success:   true,
 		FromCache: true,
 	}, true // needs background sync
@@ -2027,6 +2031,7 @@ type SyncResult struct {
 	UserEmail   string
 	Team        string
 	Banner      string
+	Prefix      string
 	Success     bool
 	ServerCount int
 	SkillCount  int
@@ -2132,6 +2137,7 @@ func doSync(mode syncMode) SyncResult {
 		UserEmail:   config.UserEmail,
 		Team:        config.Team,
 		Banner:      config.Banner,
+		Prefix:      config.Prefix,
 		Success:     true,
 		ServerCount: len(config.MCPServers),
 		SkillCount:  len(config.Skills),

@@ -111,16 +111,17 @@ export async function GET(
         .or(`is_global.eq.true,teams.cs.{"${user.team}"}`),
       supabase
         .from('zeude_settings')
-        .select('key, value')
-        .eq('key', 'banner')
-        .single(),
+        .select('key, value'),
     ])
 
     const { data: servers, error: serversError } = serversResult
     const { data: skills, error: skillsError } = skillsResult
     const { data: hooks, error: hooksError } = hooksResult
     const { data: agents, error: agentsError } = agentsResult
-    const banner: string = settingsResult.data?.value || ''
+    const settingsMap: Record<string, string> = {}
+    for (const row of settingsResult.data || []) settingsMap[row.key] = row.value
+    const banner: string = settingsMap['banner'] || ''
+    const prefix: string = settingsMap['prefix'] || 'zeude'
 
     // Sort arrays by ID for deterministic hash generation
     // Without sorting, DB may return rows in different order causing hash mismatch
@@ -230,7 +231,7 @@ export async function GET(
     const skillsHash = stableHash(skillsList)
     const hooksHash = stableHash(hooksList)
     const agentsHash = stableHash(agentsList)
-    const rootHash = stableHash({ mcpServers: mcpServersHash, skills: skillsHash, hooks: hooksHash, agents: agentsHash, banner })
+    const rootHash = stableHash({ mcpServers: mcpServersHash, skills: skillsHash, hooks: hooksHash, agents: agentsHash, banner, prefix })
 
     // Check If-None-Match header for conditional request (ETag support)
     const clientETag = req.headers.get('If-None-Match')
@@ -265,6 +266,7 @@ export async function GET(
       userEmail: user.email,
       team: user.team || 'default',
       banner: banner || undefined,
+      prefix: prefix || undefined,
     }, {
       headers: { 'ETag': rootHash },
     })
