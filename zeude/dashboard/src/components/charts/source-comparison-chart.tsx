@@ -14,18 +14,29 @@ import {
   Legend,
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-
-// Colors: Claude Code = blue, Codex = emerald
-const CLAUDE_COLOR = '#3b82f6'
-const CODEX_COLOR = '#10b981'
-const CLAUDE_COLOR_LIGHT = '#93c5fd'
-const CODEX_COLOR_LIGHT = '#6ee7b7'
-
 import type { SourceTrendPoint } from '@/lib/source-types'
 
-interface SourceComparisonChartProps {
-  data: SourceTrendPoint[]
-  metric: 'tokens' | 'cost'
+const SOURCE_COLORS: Record<string, { main: string; light: string }> = {
+  claude:   { main: '#3b82f6', light: '#93c5fd' },
+  codex:    { main: '#10b981', light: '#6ee7b7' },
+  copilot:  { main: '#8b5cf6', light: '#c4b5fd' },
+  opencode: { main: '#f97316', light: '#fdba74' },
+}
+const SOURCE_LABELS: Record<string, string> = {
+  claude: 'Claude Code', codex: 'Codex', copilot: 'Copilot', opencode: 'OpenCode',
+}
+
+// Detect which sources have data in the trend points
+function detectSources(data: SourceTrendPoint[]): string[] {
+  const sources = new Set<string>()
+  for (const d of data) {
+    for (const key of Object.keys(d)) {
+      if (key.endsWith('_inputTokens') && (d[key] as number) > 0) {
+        sources.add(key.replace('_inputTokens', ''))
+      }
+    }
+  }
+  return [...sources].sort()
 }
 
 function formatNumber(num: number): string {
@@ -34,65 +45,49 @@ function formatNumber(num: number): string {
   return num.toString()
 }
 
+// --- Comparison Chart (tokens or cost) ---
+
+interface SourceComparisonChartProps {
+  data: SourceTrendPoint[]
+  metric: 'tokens' | 'cost'
+}
+
 export const SourceComparisonChart = memo(function SourceComparisonChart({ data, metric }: SourceComparisonChartProps) {
-  const chartData = data.map((d) => ({
-    ...d,
-    date: d.date.slice(5), // MM-DD
-  }))
+  const sources = detectSources(data)
+  if (sources.length === 0) return null
+
+  const chartData = data.map(d => ({ ...d, date: d.date.slice(5) }))
 
   if (metric === 'cost') {
     return (
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Cost Comparison (Overlay)</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Daily cost: <span className="text-blue-500 font-medium">Claude Code</span> vs <span className="text-emerald-500 font-medium">Codex</span>
-          </p>
+          <div className="flex gap-2 flex-wrap">
+            {sources.map(s => (
+              <span key={s} className="text-xs">
+                <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: SOURCE_COLORS[s]?.main }} />
+                <span className="font-medium" style={{ color: SOURCE_COLORS[s]?.main }}>{SOURCE_LABELS[s] ?? s}</span>
+              </span>
+            ))}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 10 }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10 }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => `$${v.toFixed(2)}`}
-                />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `$${v.toFixed(2)}`} />
                 <Tooltip
                   contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
-                  formatter={(value, name) => {
-                    const label = name === 'claude_cost' ? 'Claude Code' : 'Codex'
-                    return [`$${Number(value).toFixed(4)}`, label]
-                  }}
-                  labelFormatter={(label) => `Date: ${label}`}
+                  formatter={(value, name) => [`$${Number(value).toFixed(4)}`, SOURCE_LABELS[String(name).replace('_cost', '')] ?? String(name)]}
+                  labelFormatter={label => `Date: ${label}`}
                 />
-                <Legend
-                  formatter={(value) => value === 'claude_cost' ? 'Claude Code' : 'Codex'}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="claude_cost"
-                  stroke={CLAUDE_COLOR}
-                  strokeWidth={2}
-                  dot={{ r: 2 }}
-                  activeDot={{ r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="codex_cost"
-                  stroke={CODEX_COLOR}
-                  strokeWidth={2}
-                  dot={{ r: 2 }}
-                  activeDot={{ r: 4 }}
-                />
+                <Legend formatter={value => SOURCE_LABELS[String(value).replace('_cost', '')] ?? String(value)} />
+                {sources.map(s => (
+                  <Line key={s} type="monotone" dataKey={`${s}_cost`} stroke={SOURCE_COLORS[s]?.main ?? '#888'} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -101,67 +96,39 @@ export const SourceComparisonChart = memo(function SourceComparisonChart({ data,
     )
   }
 
-  // Tokens: stacked bar chart with side-by-side grouping
-  const tokenData = chartData.map((d) => ({
-    date: d.date,
-    claude_input: d.claude_inputTokens,
-    claude_output: d.claude_outputTokens,
-    codex_input: d.codex_inputTokens,
-    codex_output: d.codex_outputTokens,
-  }))
-
+  // Tokens: grouped bar chart per source
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">Token Usage Comparison (Overlay)</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Daily tokens: <span className="text-blue-500 font-medium">Claude Code</span> vs <span className="text-emerald-500 font-medium">Codex</span>
-        </p>
+        <div className="flex gap-2 flex-wrap">
+          {sources.map(s => (
+            <span key={s} className="text-xs">
+              <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: SOURCE_COLORS[s]?.main }} />
+              <span className="font-medium" style={{ color: SOURCE_COLORS[s]?.main }}>{SOURCE_LABELS[s] ?? s}</span>
+            </span>
+          ))}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="h-[280px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={tokenData}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 10 }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10 }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={formatNumber}
-              />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatNumber} />
               <Tooltip
                 contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
                 formatter={(value, name) => {
-                  const labels: Record<string, string> = {
-                    claude_input: 'Claude Input',
-                    claude_output: 'Claude Output',
-                    codex_input: 'Codex Input',
-                    codex_output: 'Codex Output',
-                  }
-                  return [formatNumber(Number(value)), labels[String(name)] || String(name)]
+                  const src = String(name).startsWith('bar_') ? String(name).replace('bar_', '') : String(name)
+                  return [formatNumber(Number(value)), SOURCE_LABELS[src] ?? src]
                 }}
               />
-              <Legend
-                formatter={(value) => {
-                  const labels: Record<string, string> = {
-                    claude_input: 'Claude Input',
-                    claude_output: 'Claude Output',
-                    codex_input: 'Codex Input',
-                    codex_output: 'Codex Output',
-                  }
-                  return labels[value] || value
-                }}
-              />
-              <Bar dataKey="claude_input" stackId="claude" fill={CLAUDE_COLOR} radius={[0, 0, 0, 0]} />
-              <Bar dataKey="claude_output" stackId="claude" fill={CLAUDE_COLOR_LIGHT} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="codex_input" stackId="codex" fill={CODEX_COLOR} radius={[0, 0, 0, 0]} />
-              <Bar dataKey="codex_output" stackId="codex" fill={CODEX_COLOR_LIGHT} radius={[4, 4, 0, 0]} />
+              {sources.map(s => (
+                <Bar key={s} dataKey={`bar_${s}`} name={`bar_${s}`} fill={SOURCE_COLORS[s]?.main ?? '#888'} radius={[4, 4, 0, 0]}
+                  data={chartData.map(d => ({ ...d, [`bar_${s}`]: (d[`${s}_inputTokens`] as number || 0) + (d[`${s}_outputTokens`] as number || 0) }))}
+                />
+              ))}
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -170,35 +137,31 @@ export const SourceComparisonChart = memo(function SourceComparisonChart({ data,
   )
 })
 
-// Summary comparison cards showing side-by-side totals
+// --- Summary comparison cards ---
+
 interface SourceSummaryComparisonProps {
   data: SourceTrendPoint[]
 }
 
 export const SourceSummaryComparison = memo(function SourceSummaryComparison({ data }: SourceSummaryComparisonProps) {
-  const totals = data.reduce(
-    (acc, d) => ({
-      claude_tokens: acc.claude_tokens + d.claude_inputTokens + d.claude_outputTokens,
-      claude_cost: acc.claude_cost + d.claude_cost,
-      codex_tokens: acc.codex_tokens + d.codex_inputTokens + d.codex_outputTokens,
-      codex_cost: acc.codex_cost + d.codex_cost,
-    }),
-    { claude_tokens: 0, claude_cost: 0, codex_tokens: 0, codex_cost: 0 }
-  )
+  const sources = detectSources(data)
+  if (sources.length === 0) return null
+
+  const totals: Record<string, { tokens: number; cost: number }> = {}
+  for (const s of sources) totals[s] = { tokens: 0, cost: 0 }
+
+  for (const d of data) {
+    for (const s of sources) {
+      totals[s].tokens += (d[`${s}_inputTokens`] as number || 0) + (d[`${s}_outputTokens`] as number || 0)
+      totals[s].cost += (d[`${s}_cost`] as number || 0)
+    }
+  }
 
   const metrics = [
-    { label: 'Total Tokens', claude: formatNumber(totals.claude_tokens), codex: formatNumber(totals.codex_tokens) },
-    { label: 'Total Cost', claude: `$${totals.claude_cost.toFixed(2)}`, codex: `$${totals.codex_cost.toFixed(2)}` },
-    {
-      label: 'Avg Daily Tokens',
-      claude: data.length > 0 ? formatNumber(Math.round(totals.claude_tokens / data.length)) : '0',
-      codex: data.length > 0 ? formatNumber(Math.round(totals.codex_tokens / data.length)) : '0',
-    },
-    {
-      label: 'Avg Daily Cost',
-      claude: data.length > 0 ? `$${(totals.claude_cost / data.length).toFixed(2)}` : '$0.00',
-      codex: data.length > 0 ? `$${(totals.codex_cost / data.length).toFixed(2)}` : '$0.00',
-    },
+    { label: 'Total Tokens', getValue: (s: string) => formatNumber(totals[s].tokens) },
+    { label: 'Total Cost', getValue: (s: string) => `$${totals[s].cost.toFixed(2)}` },
+    { label: 'Avg Daily Tokens', getValue: (s: string) => data.length > 0 ? formatNumber(Math.round(totals[s].tokens / data.length)) : '0' },
+    { label: 'Avg Daily Cost', getValue: (s: string) => data.length > 0 ? `$${(totals[s].cost / data.length).toFixed(2)}` : '$0.00' },
   ]
 
   return (
@@ -207,24 +170,24 @@ export const SourceSummaryComparison = memo(function SourceSummaryComparison({ d
         <CardTitle className="text-sm">Summary Comparison</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-x-4 gap-y-3">
+        <div className="grid gap-x-4 gap-y-3" style={{ gridTemplateColumns: `1fr repeat(${sources.length}, minmax(80px, 1fr))` }}>
           {/* Header row */}
           <div className="text-xs font-medium text-muted-foreground" />
-          <div className="text-xs font-medium text-center">
-            <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1" />
-            Claude Code
-          </div>
-          <div className="text-xs font-medium text-center">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1" />
-            Codex
-          </div>
-
+          {sources.map(s => (
+            <div key={s} className="text-xs font-medium text-center">
+              <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: SOURCE_COLORS[s]?.main }} />
+              {SOURCE_LABELS[s] ?? s}
+            </div>
+          ))}
           {/* Data rows */}
-          {metrics.map((m) => (
+          {metrics.map(m => (
             <Fragment key={m.label}>
               <div className="text-sm text-muted-foreground">{m.label}</div>
-              <div className="text-sm font-mono text-center font-semibold text-blue-600">{m.claude}</div>
-              <div className="text-sm font-mono text-center font-semibold text-emerald-600">{m.codex}</div>
+              {sources.map(s => (
+                <div key={s} className="text-sm font-mono text-center font-semibold" style={{ color: SOURCE_COLORS[s]?.main }}>
+                  {m.getValue(s)}
+                </div>
+              ))}
             </Fragment>
           ))}
         </div>

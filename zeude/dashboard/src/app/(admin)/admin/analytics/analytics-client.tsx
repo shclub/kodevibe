@@ -147,6 +147,7 @@ export default function AnalyticsClient() {
   const [period, setPeriod] = useState<Period>('7d')
   const [source, setSource] = useState<SourceFilter>('all')
   const [compareMode, setCompareMode] = useState(false)
+  const [compareSources, setCompareSources] = useState<string[]>(['claude', 'codex'])
   const [userSearchInput, setUserSearchInput] = useState('')
   const [userQuery, setUserQuery] = useState('')
   const [userPage, setUserPage] = useState(1)
@@ -162,7 +163,7 @@ export default function AnalyticsClient() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
   // React Query hooks
-  const overviewQuery = useAnalyticsOverview(period, source, compareMode)
+  const overviewQuery = useAnalyticsOverview(period, source, compareMode, compareSources)
   const userUsageQuery = useUserUsage(period, userPage, userQuery)
   const insightsQuery = useUserInsights(selectedUserId, source)
   const registerCohort = useRegisterCohort()
@@ -248,18 +249,38 @@ export default function AnalyticsClient() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCompareMode(!compareMode)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-              compareMode
-                ? 'bg-purple-600 text-white border-purple-600'
-                : 'hover:bg-muted border-border'
-            }`}
-            title="Toggle side-by-side comparison of Claude Code vs Codex"
-          >
-            <GitCompareArrows className="h-4 w-4" />
-            Compare
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setCompareMode(!compareMode)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                compareMode
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'hover:bg-muted border-border'
+              }`}
+            >
+              <GitCompareArrows className="h-4 w-4" />
+              Compare
+            </button>
+            {compareMode && (
+              <div className="absolute top-full left-0 mt-1 bg-popover border rounded-lg shadow-lg p-2 z-50 min-w-[180px]">
+                <div className="text-xs font-medium text-muted-foreground px-2 py-1">Select sources to compare</div>
+                {(['claude', 'codex', 'copilot', 'opencode'] as const).map(s => (
+                  <label key={s} className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted rounded cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={compareSources.includes(s)}
+                      onChange={() => setCompareSources(prev =>
+                        prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
+                      )}
+                      className="rounded"
+                    />
+                    <span className={`w-2 h-2 rounded-full ${SOURCE_DOT_COLORS[s]}`} />
+                    {SOURCE_LABELS[s]}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="flex border rounded-lg">
             {(['all', 'claude', 'codex', 'copilot', 'opencode'] as SourceFilter[]).map((s, i, arr) => (
               <button

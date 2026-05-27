@@ -6,8 +6,8 @@ export const queryKeys = {
   },
   analytics: {
     all: ['analytics'] as const,
-    overview: (period: string, source: string, compare: boolean) =>
-      ['analytics', 'overview', { period, source, compare }] as const,
+    overview: (period: string, source: string, compare: boolean, compareSources?: string[]) =>
+      ['analytics', 'overview', { period, source, compare, compareSources }] as const,
     userUsage: (period: string, page: number, search: string) =>
       ['analytics', 'userUsage', { period, page, search }] as const,
     userInsights: (userId: string, source: string) =>

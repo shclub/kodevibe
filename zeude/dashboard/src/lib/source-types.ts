@@ -1,5 +1,4 @@
-// Shared types for Claude Code vs Codex source comparison analytics.
-// Used by usage API route, admin analytics page, and comparison chart components.
+// Shared types for multi-source comparison analytics.
 
 export interface SourceBreakdown {
   source: string
@@ -11,23 +10,11 @@ export interface SourceBreakdown {
 
 export interface SourceTrendPoint {
   date: string
-  claude_inputTokens: number
-  claude_outputTokens: number
-  claude_cost: number
-  codex_inputTokens: number
-  codex_outputTokens: number
-  codex_cost: number
+  [key: string]: string | number // date + dynamic source fields like claude_inputTokens, codex_cost, etc.
 }
 
 export interface UserSourceUsage {
   userId: string
   userName: string
-  claude_inputTokens: number
-  claude_outputTokens: number
-  claude_cost: number
-  claude_requestCount: number
-  codex_inputTokens: number
-  codex_outputTokens: number
-  codex_cost: number
-  codex_requestCount: number
+  [key: string]: string | number // userId, userName + dynamic source fields
 }

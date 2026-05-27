@@ -124,10 +124,11 @@ export interface AnalyticsOverviewData {
 
 // --- Fetch functions ---
 
-async function fetchOverview(period: string, source: string, compare: boolean): Promise<AnalyticsOverviewData> {
+async function fetchOverview(period: string, source: string, compare: boolean, compareSources?: string[]): Promise<AnalyticsOverviewData> {
   const days = period === '7d' ? 7 : period === '30d' ? 30 : 90
+  const compareParams = compare ? `&compare=true${compareSources?.length ? `&compareSources=${compareSources.join(',')}` : ''}` : ''
   const [usageRes, efficiencyRes, skillsRes] = await Promise.all([
-    fetch(`/api/admin/analytics/usage?period=${period}&overviewOnly=1&source=${source}${compare ? '&compare=true' : ''}`),
+    fetch(`/api/admin/analytics/usage?period=${period}&overviewOnly=1&source=${source}${compareParams}`),
     fetch(`/api/admin/analytics/efficiency?source=${source}`),
     fetch(`/api/admin/analytics/skills?days=${days}`),
   ])
@@ -192,10 +193,10 @@ async function registerCohort(cohortKey: string): Promise<CohortRegisterResult> 
 
 // --- Hooks ---
 
-export function useAnalyticsOverview(period: string, source: string, compare: boolean) {
+export function useAnalyticsOverview(period: string, source: string, compare: boolean, compareSources?: string[]) {
   return useQuery({
-    queryKey: queryKeys.analytics.overview(period, source, compare),
-    queryFn: () => fetchOverview(period, source, compare),
+    queryKey: queryKeys.analytics.overview(period, source, compare, compareSources),
+    queryFn: () => fetchOverview(period, source, compare, compareSources),
     staleTime: 60_000,
   })
 }

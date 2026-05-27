@@ -383,8 +383,16 @@ export async function GET(req: Request) {
 
       // Comparison mode: fetch per-source trend and per-user-per-source breakdowns
       if (compare) {
+        // Get compare sources from query params (comma-separated), default to all
+        const compareParam = searchParams.get('compareSources') || ''
+        const compareSources = compareParam
+          ? compareParam.split(',').filter(s => ['claude','codex','copilot','opencode'].includes(s))
+          : ['claude', 'codex', 'copilot', 'opencode']
+
+        // Build source filter for ClickHouse
+        const sourceList = compareSources.map(s => `'${s}'`).join(',')
+
         const [trendBySourceResult, userBySourceResult] = await Promise.all([
-          // Daily trend broken down by source (dual series for overlay charts)
           clickhouse.query({
             query: `
               SELECT
@@ -395,14 +403,13 @@ export async function GET(req: Request) {
                 sum(cost_usd) as cost
               FROM token_usage_hourly
               WHERE hour >= now() - INTERVAL ${days} DAY
-                AND source IN ('claude', 'codex')
+                AND source IN (${sourceList})
               GROUP BY date, source
               ORDER BY date
             `,
             format: 'JSONEachRow',
           }),
 
-          // Per-user breakdown by source (split table)
           clickhouse.query({
             query: `
               SELECT
@@ -415,7 +422,7 @@ export async function GET(req: Request) {
                 sum(request_count) as request_count
               FROM token_usage_hourly
               WHERE hour >= now() - INTERVAL ${days} DAY
-                AND source IN ('claude', 'codex')
+                AND source IN (${sourceList})
               GROUP BY user_id, source
               ORDER BY input_tokens DESC
             `,
@@ -437,64 +444,57 @@ export async function GET(req: Request) {
           input_tokens: string; output_tokens: string; cost: string; request_count: string
         }[]
 
-        // Pivot trend data: merge claude + codex rows for each date into a single object
+        // Pivot trend data: dynamic source fields
         const trendByDateMap = new Map<string, SourceTrendPoint>()
         for (const row of trendBySourceData) {
           if (!trendByDateMap.has(row.date)) {
-            trendByDateMap.set(row.date, {
-              date: row.date,
-              claude_inputTokens: 0, claude_outputTokens: 0, claude_cost: 0,
-              codex_inputTokens: 0, codex_outputTokens: 0, codex_cost: 0,
-            })
+            const point: SourceTrendPoint = { date: row.date }
+            for (const s of compareSources) {
+              point[`${s}_inputTokens`] = 0
+              point[`${s}_outputTokens`] = 0
+              point[`${s}_cost`] = 0
+            }
+            trendByDateMap.set(row.date, point)
           }
           const point = trendByDateMap.get(row.date)!
-          const inputTokens = parseInt(row.input_tokens) || 0
-          const outputTokens = parseInt(row.output_tokens) || 0
-          const cost = Math.round((parseFloat(row.cost) || 0) * 100) / 100
-          if (row.source === 'codex') {
-            point.codex_inputTokens = inputTokens
-            point.codex_outputTokens = outputTokens
-            point.codex_cost = cost
-          } else {
-            point.claude_inputTokens = inputTokens
-            point.claude_outputTokens = outputTokens
-            point.claude_cost = cost
-          }
+          const src = row.source
+          point[`${src}_inputTokens`] = parseInt(row.input_tokens) || 0
+          point[`${src}_outputTokens`] = parseInt(row.output_tokens) || 0
+          point[`${src}_cost`] = Math.round((parseFloat(row.cost) || 0) * 100) / 100
         }
         response.trendBySource = Array.from(trendByDateMap.values())
           .sort((a, b) => a.date.localeCompare(b.date))
 
-        // Pivot user data: merge per-source rows into a single row per user
+        // Pivot user data: dynamic source fields
         const userBySourceMap = new Map<string, UserSourceUsage>()
         for (const row of userBySourceData) {
           const key = row.user_id || row.user_email
           if (!userBySourceMap.has(key)) {
-            userBySourceMap.set(key, {
+            const entry: UserSourceUsage = {
               userId: row.user_id || row.user_email,
               userName: getDisplayName(row.user_id, row.user_email),
-              claude_inputTokens: 0, claude_outputTokens: 0, claude_cost: 0, claude_requestCount: 0,
-              codex_inputTokens: 0, codex_outputTokens: 0, codex_cost: 0, codex_requestCount: 0,
-            })
+            }
+            for (const s of compareSources) {
+              entry[`${s}_inputTokens`] = 0
+              entry[`${s}_outputTokens`] = 0
+              entry[`${s}_cost`] = 0
+              entry[`${s}_requestCount`] = 0
+            }
+            userBySourceMap.set(key, entry)
           }
           const entry = userBySourceMap.get(key)!
-          const inputTokens = parseInt(row.input_tokens) || 0
-          const outputTokens = parseInt(row.output_tokens) || 0
-          const cost = Math.round((parseFloat(row.cost) || 0) * 100) / 100
-          const requestCount = parseInt(row.request_count) || 0
-          if (row.source === 'codex') {
-            entry.codex_inputTokens = inputTokens
-            entry.codex_outputTokens = outputTokens
-            entry.codex_cost = cost
-            entry.codex_requestCount = requestCount
-          } else {
-            entry.claude_inputTokens = inputTokens
-            entry.claude_outputTokens = outputTokens
-            entry.claude_cost = cost
-            entry.claude_requestCount = requestCount
-          }
+          const src = row.source
+          entry[`${src}_inputTokens`] = parseInt(row.input_tokens) || 0
+          entry[`${src}_outputTokens`] = parseInt(row.output_tokens) || 0
+          entry[`${src}_cost`] = Math.round((parseFloat(row.cost) || 0) * 100) / 100
+          entry[`${src}_requestCount`] = parseInt(row.request_count) || 0
         }
         response.byUserBySource = Array.from(userBySourceMap.values())
-          .sort((a, b) => (b.claude_inputTokens + b.codex_inputTokens) - (a.claude_inputTokens + a.codex_inputTokens))
+          .sort((a, b) => {
+            const aTotal = compareSources.reduce((sum, s) => sum + ((a[`${s}_inputTokens`] as number) || 0), 0)
+            const bTotal = compareSources.reduce((sum, s) => sum + ((b[`${s}_inputTokens`] as number) || 0), 0)
+            return bTotal - aTotal
+          })
       }
 
       return Response.json(response)
