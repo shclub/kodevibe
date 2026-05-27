@@ -7,6 +7,8 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // Ensure standalone output goes to .next/standalone/server.js (not nested under workspace root)
+  outputFileTracingRoot: process.cwd(),
   typescript: { ignoreBuildErrors: true },
   experimental: {
     optimizePackageImports: ['recharts', 'lucide-react'],

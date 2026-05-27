@@ -18,6 +18,8 @@ export interface PromptRecord {
   timestamp: string
   prompt_text: string
   prompt_length: number
+  prompt_type: string
+  invoked_name: string
   project_path: string
 }
 
@@ -655,4 +657,214 @@ async function _getSkillAdoptionRate(
 export function getSkillAdoptionRate(team: string, days: number = 30, source: string = 'all'): Promise<{ total_users: number; skill_users: number; adoption_rate: number }> {
   const cacheKey = ['skill-adoption-rate', team, String(days), source]
   return unstable_cache(_getSkillAdoptionRate, cacheKey, { revalidate: 120 })(team, days, source)
+}
+
+// ============================================================================
+// Frustration Analysis
+// ============================================================================
+
+export interface FrustrationDaily {
+  date: string
+  sessions: number
+  total_frustration_score: number
+  avg_frustration_density: number
+  total_requests: number
+}
+
+export interface FrustrationSession {
+  session_id: string
+  date: string
+  source: string
+  total_requests: number
+  frustration_score: number
+  frustration_density: number
+}
+
+export interface FrustratingPrompt {
+  prompt_id: string
+  session_id: string
+  timestamp: string
+  prompt_text: string
+  prompt_length: number
+  source: string
+  project_path: string
+  frustration_weight: number
+}
+
+export interface FrustrationSummary {
+  total_score: number
+  avg_density: number
+  high_frustration_sessions: number
+  total_sessions: number
+}
+
+async function _getUserFrustrationDaily(userId: string, days: number = 30): Promise<FrustrationDaily[]> {
+  const clickhouse = getClickHouseClient()
+  if (!clickhouse) return []
+
+  const result = await clickhouse.query({
+    query: `
+      SELECT
+        date,
+        count() as sessions,
+        sum(frustration_score) as total_frustration_score,
+        avg(frustration_density) as avg_frustration_density,
+        sum(total_requests) as total_requests
+      FROM frustration_analysis
+      WHERE user_id = {userId:String}
+        AND date >= today() - INTERVAL {days:UInt32} DAY
+      GROUP BY date
+      ORDER BY date ASC
+    `,
+    query_params: { userId, days },
+    format: 'JSONEachRow',
+  })
+
+  const rows = await result.json() as Record<string, string>[]
+  return rows.map(r => ({
+    date: r.date,
+    sessions: Number(r.sessions),
+    total_frustration_score: Number(r.total_frustration_score),
+    avg_frustration_density: Number(r.avg_frustration_density),
+    total_requests: Number(r.total_requests),
+  }))
+}
+
+export function getUserFrustrationDaily(userId: string, days: number = 30): Promise<FrustrationDaily[]> {
+  const cacheKey = ['user-frustration-daily', userId, String(days)]
+  return unstable_cache(_getUserFrustrationDaily, cacheKey, { revalidate: 60 })(userId, days)
+}
+
+async function _getUserFrustrationSessions(userId: string, limit: number = 20): Promise<FrustrationSession[]> {
+  const clickhouse = getClickHouseClient()
+  if (!clickhouse) return []
+
+  const result = await clickhouse.query({
+    query: `
+      SELECT
+        session_id,
+        date,
+        source,
+        total_requests,
+        frustration_score,
+        frustration_density
+      FROM frustration_analysis
+      WHERE user_id = {userId:String}
+        AND frustration_score > 0
+        AND date >= today() - INTERVAL 30 DAY
+      ORDER BY frustration_score DESC
+      LIMIT {limit:UInt32}
+    `,
+    query_params: { userId, limit },
+    format: 'JSONEachRow',
+  })
+
+  const rows = await result.json() as Record<string, string>[]
+  return rows.map(r => ({
+    session_id: r.session_id,
+    date: r.date,
+    source: r.source,
+    total_requests: Number(r.total_requests),
+    frustration_score: Number(r.frustration_score),
+    frustration_density: Number(r.frustration_density),
+  }))
+}
+
+export function getUserFrustrationSessions(userId: string, limit: number = 20): Promise<FrustrationSession[]> {
+  const cacheKey = ['user-frustration-sessions', userId, String(limit)]
+  return unstable_cache(_getUserFrustrationSessions, cacheKey, { revalidate: 60 })(userId, limit)
+}
+
+async function _getUserFrustratingPrompts(userId: string, limit: number = 20): Promise<FrustratingPrompt[]> {
+  const clickhouse = getClickHouseClient()
+  if (!clickhouse) return []
+
+  const result = await clickhouse.query({
+    query: `
+      SELECT
+        prompt_id,
+        session_id,
+        timestamp,
+        prompt_text,
+        prompt_length,
+        source,
+        project_path,
+        CASE
+          WHEN prompt_length > 150 THEN 0.0
+          WHEN match(prompt_text, '^(아니|아냐|잠깐|잠만|틀렸|잘못|그게 아니)')
+               OR match(lower(prompt_text), '^(no[, ]|nope|wrong|wait|stop|actually|incorrect)')
+          THEN 1.0
+          WHEN match(prompt_text, '(다시 해|다시해|여전히|또 |계속 안|재시도)')
+               OR match(lower(prompt_text), '(try again|do.?again|still (not|doesn|fail)|retry|redo)')
+          THEN 0.8
+          WHEN prompt_length < 60 AND (
+              match(prompt_text, '(안돼|안되|에러|오류|고쳐|수정해|실패|버그)')
+              OR match(lower(prompt_text), '(error|fail|fix|broken|bug|doesn.t work)')
+          ) THEN 0.6
+          WHEN prompt_length < 80 AND match(prompt_text, '(왜 안|뭐가 문제|이상한데|뭐지)') THEN 0.4
+          ELSE 0.0
+        END as frustration_weight
+      FROM ai_prompts
+      WHERE user_id = {userId:String}
+        AND timestamp >= now() - INTERVAL 30 DAY
+        AND prompt_text != ''
+        AND length(prompt_text) < 2000
+      HAVING frustration_weight > 0
+      ORDER BY frustration_weight DESC, timestamp DESC
+      LIMIT {limit:UInt32}
+    `,
+    query_params: { userId, limit },
+    format: 'JSONEachRow',
+  })
+
+  const rows = await result.json() as Record<string, string>[]
+  return rows.map(r => ({
+    prompt_id: r.prompt_id,
+    session_id: r.session_id,
+    timestamp: r.timestamp,
+    prompt_text: r.prompt_text,
+    prompt_length: Number(r.prompt_length),
+    source: r.source,
+    project_path: r.project_path,
+    frustration_weight: Number(r.frustration_weight),
+  }))
+}
+
+export function getUserFrustratingPrompts(userId: string, limit: number = 20): Promise<FrustratingPrompt[]> {
+  const cacheKey = ['user-frustrating-prompts', userId, String(limit)]
+  return unstable_cache(_getUserFrustratingPrompts, cacheKey, { revalidate: 60 })(userId, limit)
+}
+
+async function _getUserFrustrationSummary(userId: string, days: number = 30): Promise<FrustrationSummary> {
+  const clickhouse = getClickHouseClient()
+  if (!clickhouse) return { total_score: 0, avg_density: 0, high_frustration_sessions: 0, total_sessions: 0 }
+
+  const result = await clickhouse.query({
+    query: `
+      SELECT
+        sum(frustration_score) as total_score,
+        avg(frustration_density) as avg_density,
+        countIf(frustration_score >= 1.0) as high_frustration_sessions,
+        count() as total_sessions
+      FROM frustration_analysis
+      WHERE user_id = {userId:String}
+        AND date >= today() - INTERVAL {days:UInt32} DAY
+    `,
+    query_params: { userId, days },
+    format: 'JSONEachRow',
+  })
+
+  const rows = await result.json() as Record<string, string>[]
+  const r = rows[0] || {}
+  return {
+    total_score: Number(r.total_score || 0),
+    avg_density: Number(r.avg_density || 0),
+    high_frustration_sessions: Number(r.high_frustration_sessions || 0),
+    total_sessions: Number(r.total_sessions || 0),
+  }
+}
+
+export function getUserFrustrationSummary(userId: string, days: number = 30): Promise<FrustrationSummary> {
+  const cacheKey = ['user-frustration-summary', userId, String(days)]
+  return unstable_cache(_getUserFrustrationSummary, cacheKey, { revalidate: 60 })(userId, days)
 }

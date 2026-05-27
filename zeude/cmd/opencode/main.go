@@ -100,8 +100,9 @@ func main() {
 	if model == "" {
 		model = mcpconfig.GetOpencodeModel()
 	}
+	endpoint := config.GetCollectorEndpoint(config.DefaultCollectorEndpoint)
 	otlplog.SendSessionStart(otlplog.SessionStartParams{
-		Endpoint:  config.GetCollectorEndpoint(config.DefaultCollectorEndpoint),
+		Endpoint:  endpoint,
 		Service:   "opencode",
 		UserID:    syncResult.UserID,
 		UserEmail: syncResult.UserEmail,
@@ -114,11 +115,20 @@ func main() {
 		mcpconfig.BackgroundSync()
 	}
 
-	// 9. Exec real opencode
-	if err := execBinary(realOpencode, os.Args, os.Environ()); err != nil {
-		fmt.Fprintf(os.Stderr, "[%s] failed to exec opencode: %v\n", prefix, err)
+	// Record start time for post-session token reporting (5-min buffer before launch)
+	sessionStartMs := time.Now().UnixMilli() - 5*60*1000
+
+	// 9. Run real opencode as a subprocess (not syscall.Exec) so we can post-process.
+	exitCode, err := execBinary(realOpencode, os.Args, os.Environ())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[%s] failed to run opencode: %v\n", prefix, err)
 		os.Exit(1)
 	}
+
+	// 10. Report token usage from opencode's SQLite DB (fire-and-forget).
+	reportOpenCodeSessions(syncResult, endpoint, sessionStartMs)
+
+	os.Exit(exitCode)
 }
 
 func isBackgroundSyncMode() bool {

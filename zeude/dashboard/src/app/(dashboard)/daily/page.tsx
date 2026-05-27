@@ -1,6 +1,6 @@
 import dynamic from 'next/dynamic'
 import { getUser } from '@/lib/session'
-import { getDailyStats, getDailyInvocations, parseSourceParam, isInvocationOnlySource, type DailyInvocation } from '@/lib/clickhouse'
+import { getDailyStats, getDailyInvocations, parseSourceParam, isInvocationOnlySource, type DailyInvocation, type DailyStats } from '@/lib/clickhouse'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SourceFilter as SourceFilterComponent } from '@/components/dashboard/source-filter'
@@ -21,10 +21,11 @@ interface DailyPageProps {
 }
 
 function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('en-US', {
+  return new Date(date).toLocaleDateString('ko-KR', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
+    timeZone: 'Asia/Seoul',
   })
 }
 
@@ -184,10 +185,16 @@ export default async function DailyPage({ searchParams }: DailyPageProps) {
   }
 
   // Token-based tools (claude, codex, all)
-  let stats: Awaited<ReturnType<typeof getDailyStats>> = []
+  let stats: DailyStats[] = []
+  // Extra invocations for copilot+opencode when source='all'
+  let invocations: DailyInvocation[] = []
 
   try {
-    stats = await getDailyStats(user.email, user.id, 30, source)
+    const fetches: [Promise<DailyStats[]>, Promise<DailyInvocation[]>] = [
+      getDailyStats(user.email, user.id, 30, source),
+      source === 'all' ? getDailyInvocations(user.email, user.id, 30, 'all') : Promise.resolve([]),
+    ]
+    ;[stats, invocations] = await Promise.all(fetches)
   } catch (error) {
     console.error('Failed to fetch daily stats:', error)
   }
@@ -202,6 +209,15 @@ export default async function DailyPage({ searchParams }: DailyPageProps) {
     }),
     { sessions: 0, cost: 0, input_tokens: 0, output_tokens: 0 }
   )
+
+  // Aggregate invocations (copilot+opencode) by date
+  const invocationsByDate = invocations.reduce<Record<string, { count: number; sources: Set<string> }>>((acc, r) => {
+    if (!acc[r.date]) acc[r.date] = { count: 0, sources: new Set() }
+    acc[r.date].count += Number(r.invocation_count)
+    acc[r.date].sources.add(r.source)
+    return acc
+  }, {})
+  const totalInvocations = invocations.reduce((sum, r) => sum + Number(r.invocation_count), 0)
 
   // Pre-process chart data server-side to minimize serialization payload
   const costData = stats.map(d => ({ date: d.date, cost: Number(d.cost) }))
@@ -226,7 +242,12 @@ export default async function DailyPage({ searchParams }: DailyPageProps) {
             <CardTitle className="text-sm font-medium">30-Day Sessions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totals.sessions}</div>
+            <div className="text-2xl font-bold">{totals.sessions + totalInvocations}</div>
+            {source === 'all' && totalInvocations > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {totals.sessions} token + {totalInvocations} invocations
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -235,6 +256,9 @@ export default async function DailyPage({ searchParams }: DailyPageProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${totals.cost.toFixed(2)}</div>
+            {source === 'all' && totalInvocations > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">Claude/Codex only</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -261,11 +285,49 @@ export default async function DailyPage({ searchParams }: DailyPageProps) {
         <TokenChart data={tokenData} />
       </div>
 
-      {/* Daily Breakdown Table */}
+      {/* Copilot + OpenCode invocations (only shown when source='all') */}
+      {source === 'all' && Object.keys(invocationsByDate).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Copilot &amp; OpenCode Invocations</CardTitle>
+            <CardDescription>Daily tool invocations (no token data)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Invocations</TableHead>
+                  <TableHead>Tools</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Object.entries(invocationsByDate)
+                  .sort(([a], [b]) => b.localeCompare(a))
+                  .map(([date, row]) => (
+                    <TableRow key={date}>
+                      <TableCell className="font-medium">{formatDate(date)}</TableCell>
+                      <TableCell>{row.count}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {[...row.sources].map(s => (
+                          <Badge key={s} variant="outline" className="mr-1 text-xs capitalize">{s}</Badge>
+                        ))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Daily Breakdown Table (token-based: claude + codex) */}
       <Card>
         <CardHeader>
           <CardTitle>Daily Breakdown</CardTitle>
-          <CardDescription>Detailed usage by day</CardDescription>
+          <CardDescription>
+            {source === 'all' ? 'Claude Code & Codex token usage by day' : 'Detailed usage by day'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {stats.length === 0 ? (

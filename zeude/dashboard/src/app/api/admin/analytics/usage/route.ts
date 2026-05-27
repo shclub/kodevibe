@@ -111,7 +111,7 @@ export async function GET(req: Request) {
       }
 
       // Query MV for performance (cost_usd stored directly)
-      const [summaryResult, trendResult, userResult, userCountResult, sourceBreakdownResult] = await Promise.all([
+      const [summaryResult, trendResult, userResult, userCountResult, sourceBreakdownResult, invocationBreakdownResult] = await Promise.all([
         // Summary query - from MV with cost_usd
         usersOnly ? null : clickhouse.query({
           query: `
@@ -201,9 +201,8 @@ export async function GET(req: Request) {
           format: 'JSONEachRow',
         }),
 
-        // Source breakdown query - compare Claude Code vs Codex side-by-side.
-        // Intentionally does NOT apply sourceFilter: this query always returns
-        // all sources so the comparison chart can show them side-by-side.
+        // Source breakdown query — token_usage_hourly covers claude + codex only.
+        // Always returns all token-based sources (no sourceFilter) for comparison chart.
         usersOnly ? null : clickhouse.query({
           query: `
             SELECT
@@ -219,15 +218,32 @@ export async function GET(req: Request) {
           `,
           format: 'JSONEachRow',
         }),
+
+        // Invocation breakdown for copilot + opencode (tool_invocations_daily).
+        // These sources have no token data, so request_count = invocation_count.
+        usersOnly ? null : clickhouse.query({
+          query: `
+            SELECT
+              source,
+              sum(invocation_count) as request_count
+            FROM tool_invocations_daily
+            WHERE date >= today() - INTERVAL ${days} DAY
+              AND source IN ('copilot', 'opencode')
+            GROUP BY source
+            ORDER BY source
+          `,
+          format: 'JSONEachRow',
+        }),
       ])
 
       // Parse results in parallel
-      const [summaryDataRaw, trendDataRaw, userDataRaw, userCountRaw, sourceBreakdownDataRaw] = await Promise.all([
+      const [summaryDataRaw, trendDataRaw, userDataRaw, userCountRaw, sourceBreakdownDataRaw, invocationBreakdownDataRaw] = await Promise.all([
         summaryResult ? summaryResult.json() : Promise.resolve([]),
         trendResult ? trendResult.json() : Promise.resolve([]),
         userResult ? userResult.json() : Promise.resolve([]),
         userCountResult ? userCountResult.json() : Promise.resolve([]),
         sourceBreakdownResult ? sourceBreakdownResult.json() : Promise.resolve([]),
+        invocationBreakdownResult ? invocationBreakdownResult.json() : Promise.resolve([]),
       ])
 
       const summaryData = summaryDataRaw as {
@@ -259,6 +275,10 @@ export async function GET(req: Request) {
         input_tokens: string
         output_tokens: string
         cost: string
+        request_count: string
+      }[]
+      const invocationBreakdownData = invocationBreakdownDataRaw as {
+        source: string
         request_count: string
       }[]
 
@@ -314,7 +334,8 @@ export async function GET(req: Request) {
       // Calculate cache hit rate
       const cacheHitRate = totalInput > 0 ? totalCacheRead / totalInput : 0
 
-      // Process source breakdown for Claude Code vs Codex comparison
+      // Process source breakdown: token data from token_usage_hourly, then merge
+      // invocation counts from tool_invocations_daily (avoiding duplicates).
       const sourceBreakdown: SourceBreakdown[] = sourceBreakdownData.map(row => ({
         source: row.source || 'unknown',
         inputTokens: parseInt(row.input_tokens) || 0,
@@ -322,6 +343,23 @@ export async function GET(req: Request) {
         cost: Math.round((parseFloat(row.cost) || 0) * 100) / 100,
         requestCount: parseInt(row.request_count) || 0,
       }))
+      // Merge invocation counts into existing sources or add invocation-only entries.
+      for (const row of invocationBreakdownData) {
+        const src = row.source || 'unknown'
+        const invCount = parseInt(row.request_count) || 0
+        const existing = sourceBreakdown.find(s => s.source === src)
+        if (existing) {
+          existing.requestCount += invCount
+        } else {
+          sourceBreakdown.push({
+            source: src,
+            inputTokens: 0,
+            outputTokens: 0,
+            cost: 0,
+            requestCount: invCount,
+          })
+        }
+      }
 
       const response: UsageResponse = {
         summary: {
@@ -357,6 +395,7 @@ export async function GET(req: Request) {
                 sum(cost_usd) as cost
               FROM token_usage_hourly
               WHERE hour >= now() - INTERVAL ${days} DAY
+                AND source IN ('claude', 'codex')
               GROUP BY date, source
               ORDER BY date
             `,
@@ -376,6 +415,7 @@ export async function GET(req: Request) {
                 sum(request_count) as request_count
               FROM token_usage_hourly
               WHERE hour >= now() - INTERVAL ${days} DAY
+                AND source IN ('claude', 'codex')
               GROUP BY user_id, source
               ORDER BY input_tokens DESC
             `,

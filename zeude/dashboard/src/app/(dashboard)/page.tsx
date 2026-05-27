@@ -1,5 +1,15 @@
 import { getUser } from '@/lib/session'
-import { getSessionsToday, getOverviewStats, parseSourceParam, type SessionSummary, type OverviewStats } from '@/lib/clickhouse'
+import {
+  getSessionsToday,
+  getOverviewStats,
+  getTodayInvocationCount,
+  getTodayStatsBySource,
+  parseSourceParam,
+  isInvocationOnlySource,
+  type SessionSummary,
+  type OverviewStats,
+  type SourceStat,
+} from '@/lib/clickhouse'
 import { StatsCard } from '@/components/dashboard/stats-card'
 import { RecentSessions } from '@/components/dashboard/recent-sessions'
 import { SourceFilter as SourceFilterComponent } from '@/components/dashboard/source-filter'
@@ -9,29 +19,119 @@ interface OverviewPageProps {
   searchParams: Promise<{ source?: string }>
 }
 
+const SOURCE_COLORS: Record<string, string> = {
+  claude:    'border-blue-200 bg-blue-50',
+  codex:     'border-emerald-200 bg-emerald-50',
+  opencode:  'border-orange-200 bg-orange-50',
+  copilot:   'border-purple-200 bg-purple-50',
+}
+const SOURCE_DOT: Record<string, string> = {
+  claude:   'bg-blue-500',
+  codex:    'bg-emerald-500',
+  opencode: 'bg-orange-500',
+  copilot:  'bg-purple-500',
+}
+const SOURCE_LABELS: Record<string, string> = {
+  claude:   'Claude Code',
+  codex:    'Codex',
+  opencode: 'OpenCode',
+  copilot:  'GitHub Copilot',
+}
+
+function formatNum(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return n.toString()
+}
+
+function SourceBreakdown({ stats }: { stats: SourceStat[] }) {
+  const visible = stats.filter(s => s.sessions > 0 || s.invocations > 0 || s.input_tokens > 0)
+  if (visible.length === 0) return null
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {visible.map((s) => {
+        const colors = SOURCE_COLORS[s.source] ?? 'border-gray-200 bg-gray-50'
+        const dot = SOURCE_DOT[s.source] ?? 'bg-gray-400'
+        const label = SOURCE_LABELS[s.source] ?? s.source
+        // Show invocations view only when there's no token data (transitional: old data before shim upgrade)
+        const isInvOnly = s.invocations > 0 && s.input_tokens === 0 && s.output_tokens === 0
+
+        return (
+          <div key={s.source} className={`rounded-xl border p-4 space-y-2 ${colors}`}>
+            <div className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
+              <span className="text-sm font-semibold">{label}</span>
+            </div>
+            {isInvOnly ? (
+              <div>
+                <p className="text-2xl font-bold">{s.invocations}</p>
+                <p className="text-xs text-muted-foreground">invocations (no token data yet)</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Sessions</span><span className="font-mono font-medium text-foreground">{s.sessions}</span>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Input</span><span className="font-mono font-medium text-foreground">{formatNum(s.input_tokens)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Output</span><span className="font-mono font-medium text-foreground">{formatNum(s.output_tokens)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Cost</span><span className="font-mono font-medium text-foreground">${s.cost.toFixed(3)}</span>
+                </div>
+                {s.invocations > 0 && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Invocations</span><span className="font-mono font-medium text-foreground">{s.invocations}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default async function OverviewPage({ searchParams }: OverviewPageProps) {
   const user = await getUser()
   const params = await searchParams
   const source = parseSourceParam(params.source ?? null)
+  const invocationOnly = isInvocationOnlySource(source)
 
   let sessions: SessionSummary[] = []
   let todayStats: OverviewStats = {
     total_sessions: 0,
     total_cost: 0,
     total_input_tokens: 0,
-    total_output_tokens: 0
+    total_output_tokens: 0,
   }
+  let extraInvocations = 0
+  let sourceStats: SourceStat[] = []
 
   try {
-    const results = await Promise.all([
-      getSessionsToday(user.email, user.id, source),
-      getOverviewStats(user.email, user.id, source),
-    ])
-    sessions = results[0]
-    todayStats = results[1]
+    if (invocationOnly) {
+      extraInvocations = await getTodayInvocationCount(user.email, user.id, source)
+    } else {
+      const fetches = await Promise.all([
+        getSessionsToday(user.email, user.id, source),
+        getOverviewStats(user.email, user.id, source),
+        source === 'all' ? getTodayInvocationCount(user.email, user.id, 'all') : Promise.resolve(0),
+        source === 'all' ? getTodayStatsBySource(user.email, user.id) : Promise.resolve([]),
+      ])
+      sessions = fetches[0]
+      todayStats = fetches[1]
+      extraInvocations = fetches[2]
+      sourceStats = fetches[3]
+    }
   } catch (error) {
     console.error('Failed to fetch ClickHouse data:', error)
   }
+
+  const totalSessions = Number(todayStats.total_sessions) + extraInvocations
 
   return (
     <div className="space-y-8">
@@ -45,34 +145,44 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
         <SourceFilterComponent useSearchParams />
       </div>
 
+      {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 stagger-children">
         <StatsCard
           title="Sessions Today"
-          value={Number(todayStats.total_sessions)}
+          value={totalSessions}
           icon={Activity}
-          description="Active coding sessions"
+          description={
+            source === 'all' && extraInvocations > 0
+              ? `Claude/Codex sessions + ${extraInvocations} tool invocations`
+              : invocationOnly
+              ? 'Tool invocations'
+              : 'Active coding sessions'
+          }
         />
         <StatsCard
           title="Cost Today"
-          value={`$${Number(todayStats.total_cost).toFixed(4)}`}
+          value={invocationOnly ? 'N/A' : `$${Number(todayStats.total_cost).toFixed(4)}`}
           icon={DollarSign}
           description="API usage cost"
         />
         <StatsCard
           title="Input Tokens"
-          value={Number(todayStats.total_input_tokens).toLocaleString()}
+          value={invocationOnly ? 'N/A' : Number(todayStats.total_input_tokens).toLocaleString()}
           icon={Hash}
           description="Prompts and context"
         />
         <StatsCard
           title="Output Tokens"
-          value={Number(todayStats.total_output_tokens).toLocaleString()}
+          value={invocationOnly ? 'N/A' : Number(todayStats.total_output_tokens).toLocaleString()}
           icon={Zap}
           description="Generated responses"
         />
       </div>
 
-      <RecentSessions sessions={sessions.slice(0, 10)} />
+      {/* Source Breakdown (only when 'all' is selected) */}
+      {source === 'all' && <SourceBreakdown stats={sourceStats} />}
+
+      {!invocationOnly && <RecentSessions sessions={sessions.slice(0, 10)} />}
     </div>
   )
 }

@@ -47,6 +47,8 @@ export interface SessionSummary {
   total_cost: number
   input_tokens: number
   output_tokens: number
+  premium_requests: number
+  source: string
 }
 
 export interface DailyStats {
@@ -98,9 +100,11 @@ export function parseSourceParam(value: string | null): SourceFilter {
   return 'all'
 }
 
-// Returns true for sources that send session_start logs but no token data.
-export function isInvocationOnlySource(source: SourceFilter): boolean {
-  return source === 'copilot' || source === 'opencode'
+// Returns true for sources that only track invocations, not token usage.
+// Copilot and OpenCode now emit token data via their shims, so they are no longer
+// invocation-only. This function is kept for backward compatibility but always returns false.
+export function isInvocationOnlySource(_source: SourceFilter): boolean {
+  return false
 }
 
 // Escape a string value for safe interpolation in ClickHouse SQL.
@@ -154,14 +158,21 @@ async function _getSessionsToday(userEmail: string, userId: string = '', source:
         count() as event_count,
         ${COST_EXPR} as total_cost,
         ${INPUT_TOKENS_EXPR} as input_tokens,
-        sum(toInt64OrZero(LogAttributes['output_tokens'])) as output_tokens
+        sum(toInt64OrZero(LogAttributes['output_tokens'])) as output_tokens,
+        max(toInt64OrZero(LogAttributes['premium_requests'])) as premium_requests,
+        multiIf(
+          any(ServiceName) ILIKE 'codex%', 'codex',
+          any(ServiceName) ILIKE 'opencode%', 'opencode',
+          any(ServiceName) ILIKE 'copilot%', 'copilot',
+          'claude'
+        ) as source
       FROM claude_code_logs
       ${PRICING_JOIN}
       WHERE ${USER_MATCH_CONDITION}
         AND Timestamp >= today()
         ${sourceCondition}
       GROUP BY session_id
-      HAVING session_id != ''
+      HAVING session_id != '' AND countIf(Body LIKE '%api_request') > 0
       ORDER BY started_at DESC
     `,
     query_params: { userEmail, userId },
@@ -252,6 +263,126 @@ export function getOverviewStats(userEmail: string, userId: string = '', source:
   return unstable_cache(_getOverviewStats, cacheKey, { revalidate: 30 })(userEmail, userId, source)
 }
 
+// Per-source breakdown of today's stats (used on overview page when source='all').
+export interface SourceStat {
+  source: string
+  sessions: number
+  cost: number
+  input_tokens: number
+  output_tokens: number
+  invocations: number // copilot/opencode only
+}
+
+async function _getTodayStatsBySource(userEmail: string, userId: string = ''): Promise<SourceStat[]> {
+  const [tokenResult, invocationResult] = await Promise.all([
+    clickhouse.query({
+      query: `
+        SELECT
+          multiIf(
+            ServiceName ILIKE 'codex%', 'codex',
+            ServiceName ILIKE 'opencode%', 'opencode',
+            ServiceName ILIKE 'copilot%', 'copilot',
+            'claude'
+          ) as source,
+          count(DISTINCT LogAttributes['session.id']) as sessions,
+          ${COST_EXPR} as cost,
+          ${INPUT_TOKENS_EXPR} as input_tokens,
+          sum(toInt64OrZero(LogAttributes['output_tokens'])) as output_tokens
+        FROM claude_code_logs
+        ${PRICING_JOIN}
+        WHERE ${USER_MATCH_CONDITION}
+          AND Timestamp >= today()
+        GROUP BY source
+        ORDER BY source
+      `,
+      query_params: { userEmail, userId },
+      format: 'JSONEachRow',
+    }),
+    clickhouse.query({
+      query: `
+        SELECT source, sum(invocation_count) as invocations
+        FROM tool_invocations_daily
+        WHERE (user_id = {userId:String} OR user_email = {userEmail:String})
+          AND date = today()
+          AND source IN ('copilot', 'opencode')
+        GROUP BY source
+      `,
+      query_params: { userEmail, userId },
+      format: 'JSONEachRow',
+    }),
+  ])
+
+  const tokenRows = (await tokenResult.json()) as { source: string; sessions: string; cost: string; input_tokens: string; output_tokens: string }[]
+  const invRows = (await invocationResult.json()) as { source: string; invocations: string }[]
+
+  const result: SourceStat[] = tokenRows.map(r => ({
+    source: r.source,
+    sessions: Number(r.sessions),
+    cost: Number(r.cost),
+    input_tokens: Number(r.input_tokens),
+    output_tokens: Number(r.output_tokens),
+    invocations: 0,
+  }))
+
+  for (const inv of invRows) {
+    const existing = result.find(r => r.source === inv.source)
+    if (existing) {
+      existing.invocations = Number(inv.invocations)
+    } else {
+      result.push({ source: inv.source, sessions: 0, cost: 0, input_tokens: 0, output_tokens: 0, invocations: Number(inv.invocations) })
+    }
+  }
+
+  return result.sort((a, b) => a.source.localeCompare(b.source))
+}
+
+export function getTodayStatsBySource(userEmail: string, userId: string = ''): Promise<SourceStat[]> {
+  const cacheKey = ['today-stats-by-source', userEmail, userId]
+  return unstable_cache(_getTodayStatsBySource, cacheKey, { revalidate: 30 })(userEmail, userId)
+}
+
+// Today's invocation count from tool_invocations_daily for invocation-only sources.
+// Used by overview page to add copilot+opencode counts when source='all'.
+async function _getTodayInvocationCount(
+  userEmail: string,
+  userId: string = '',
+  source: SourceFilter = 'all'
+): Promise<number> {
+  // When source='all', fetch only copilot+opencode (token sources covered by getOverviewStats).
+  // When source is a specific invocation-only source, fetch just that source.
+  const sourceCondition = source === 'all'
+    ? INVOCATION_ONLY_CONDITION
+    : buildMVSourceCondition(source)
+  const result = await clickhouse.query({
+    query: `
+      SELECT sum(invocation_count) as total
+      FROM tool_invocations_daily
+      WHERE (user_id = {userId:String} OR user_email = {userEmail:String})
+        AND date = today()
+        ${sourceCondition}
+    `,
+    query_params: { userEmail, userId },
+    format: 'JSONEachRow',
+  })
+  const rows = await result.json() as { total: string }[]
+  return Number(rows[0]?.total ?? 0)
+}
+
+export function getTodayInvocationCount(userEmail: string, userId: string = '', source: SourceFilter = 'all'): Promise<number> {
+  const cacheKey = ['today-invocation-count', userEmail, userId, source]
+  return unstable_cache(_getTodayInvocationCount, cacheKey, { revalidate: 30 })(userEmail, userId, source)
+}
+
+// Returns true for sources that only have invocation data (no tokens).
+// Used to decide whether to also fetch tool_invocations_daily when source='all'.
+export function isInvocationOnlySourceName(source: string): boolean {
+  return source === 'copilot' || source === 'opencode'
+}
+
+// SQL condition that restricts to invocation-only sources (copilot + opencode).
+// Used when combining token data (claude/codex) with invocation data for source='all'.
+const INVOCATION_ONLY_CONDITION = "AND source IN ('copilot', 'opencode')"
+
 // Daily invocation stats from tool_invocations_daily MV (copilot/opencode).
 // Groups by date and model_id so callers can build model breakdowns.
 export interface DailyInvocation {
@@ -267,7 +398,11 @@ async function _getDailyInvocations(
   days: number = 30,
   source: SourceFilter = 'all'
 ): Promise<DailyInvocation[]> {
-  const sourceCondition = buildMVSourceCondition(source)
+  // When source='all', only fetch copilot+opencode from this MV to avoid
+  // double-counting claude/codex which are already covered by token_usage_hourly.
+  const sourceCondition = source === 'all'
+    ? INVOCATION_ONLY_CONDITION
+    : buildMVSourceCondition(source)
   const result = await clickhouse.query({
     query: `
       SELECT
@@ -298,14 +433,53 @@ export function getDailyInvocations(
   return unstable_cache(_getDailyInvocations, cacheKey, { revalidate: 60 })(userEmail, userId, days, source)
 }
 
-export async function getSessionDetails(userEmail: string, userId: string, sessionId: string) {
+export interface SessionEvent {
+  timestamp: string
+  event_name: string
+  model: string
+  prompt_id: string
+  prompt_length: number
+  tool_name: string
+  tool_decision: string
+  query_source: string
+  duration_ms: number
+  command_name: string
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_creation_tokens: number
+  cost_usd: number
+  attributes: Record<string, string>
+}
+
+export async function getSessionDetails(userEmail: string, userId: string, sessionId: string): Promise<SessionEvent[]> {
   const result = await clickhouse.query({
     query: `
       SELECT
         Timestamp as timestamp,
         Body as event_name,
+        LogAttributes['model'] as model,
+        LogAttributes['prompt.id'] as prompt_id,
+        toInt64OrZero(LogAttributes['prompt_length']) as prompt_length,
+        LogAttributes['tool_name'] as tool_name,
+        LogAttributes['decision'] as tool_decision,
+        LogAttributes['query_source'] as query_source,
+        toInt64OrZero(LogAttributes['duration_ms']) as duration_ms,
+        LogAttributes['command_name'] as command_name,
+        toInt64OrZero(LogAttributes['input_tokens']) as input_tokens,
+        toInt64OrZero(LogAttributes['output_tokens']) as output_tokens,
+        toInt64OrZero(LogAttributes['cache_read_tokens']) as cache_read_tokens,
+        toInt64OrZero(LogAttributes['cache_creation_tokens']) as cache_creation_tokens,
+        if(pm.model_id != '',
+          toInt64OrZero(LogAttributes['input_tokens']) * pm.input_price / 1000000.0
+          + toInt64OrZero(LogAttributes['output_tokens']) * pm.output_price / 1000000.0
+          + toInt64OrZero(LogAttributes['cache_read_tokens']) * pm.cache_read_price / 1000000.0
+          + toInt64OrZero(LogAttributes['cache_creation_tokens']) * pm.cache_creation_price / 1000000.0,
+          toFloat64OrZero(LogAttributes['cost_usd'])
+        ) as cost_usd,
         LogAttributes as attributes
       FROM claude_code_logs
+      ${PRICING_JOIN}
       WHERE ${USER_MATCH_CONDITION}
         AND LogAttributes['session.id'] = {sessionId:String}
       ORDER BY Timestamp ASC

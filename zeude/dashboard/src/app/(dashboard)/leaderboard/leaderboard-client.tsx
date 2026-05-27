@@ -333,7 +333,42 @@ export default function LeaderboardClient({ initialCohort }: { initialCohort: st
               )}
             </CardContent>
           </Card>
-        </>
+        {/* Invocation Leaders: Copilot + OpenCode */}
+        {data?.topInvocationUsers && data.topInvocationUsers.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <RotateCcw className="h-5 w-5 text-purple-500" />
+                Copilot &amp; OpenCode Invocations
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Tool invocations this week (no token data)
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {data.topInvocationUsers.map((user) => (
+                  <div
+                    key={`${user.userId}-${user.source}`}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${getRankBg(user.rank)}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {getRankIcon(user.rank)}
+                      <div>
+                        <p className="font-medium text-sm">{user.userName}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{user.source}</p>
+                      </div>
+                    </div>
+                    <span className="font-mono text-sm font-semibold text-purple-600">
+                      {user.invocations.toLocaleString()} invocations
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </>
       )}
 
       {data && (

@@ -12,9 +12,18 @@ interface LeaderboardUser {
   userId: string
 }
 
+interface InvocationLeader {
+  rank: number
+  userName: string
+  userId: string
+  source: string
+  invocations: number
+}
+
 interface LeaderboardResponse {
   topTokenUsers: LeaderboardUser[]
   previousTopTokenUsers: LeaderboardUser[]
+  topInvocationUsers?: InvocationLeader[]
   topSkills: {
     rank: number
     skillName: string
@@ -93,6 +102,8 @@ export async function GET(req: Request) {
     const promptCohortClause = buildCohortWhereClause('d_user_id', 'd_user_email', cohortFilter)
 
     try {
+      const invocationCohortClause = buildIdOnlyCohortWhereClause('user_id', cohortFilter)
+
       // Run all queries in parallel with graceful degradation
       // Uses allSettled so a single slow/failing query doesn't take down the entire endpoint
       // Group by user_id for consistent identification (works for both email and Bedrock users)
@@ -170,7 +181,28 @@ export async function GET(req: Request) {
           format: 'JSONEachRow',
         }),
 
-        // [3] Per-skill user breakdown (top users per skill)
+        // [3] Invocation leaders from copilot + opencode (tool_invocations_daily)
+        clickhouse.query({
+          query: `
+            SELECT
+              user_id,
+              any(user_email) as user_email,
+              source,
+              sum(invocation_count) as total_invocations
+            FROM tool_invocations_daily
+            WHERE date >= toDate(toDateTime(${tokenCurrentStartEpoch}))
+              AND date < today() + 1
+              AND source IN ('copilot', 'opencode')
+              AND user_id != ''
+              ${invocationCohortClause}
+            GROUP BY user_id, source
+            ORDER BY total_invocations DESC
+            LIMIT 10
+          `,
+          format: 'JSONEachRow',
+        }),
+
+        // [4] Per-skill user breakdown (top users per skill)
         clickhouse.query({
           query: `
             SELECT
@@ -206,12 +238,13 @@ export async function GET(req: Request) {
       const tokenDataRaw = results[0].status === 'fulfilled' ? await results[0].value.json() : []
       const previousTokenDataRaw = results[1].status === 'fulfilled' ? await results[1].value.json() : []
       const skillDataRaw = results[2].status === 'fulfilled' ? await results[2].value.json() : []
-      const skillUsersDataRaw = results[3].status === 'fulfilled' ? await results[3].value.json() : []
+      const invocationDataRaw = results[3].status === 'fulfilled' ? await results[3].value.json() : []
+      const skillUsersDataRaw = results[4].status === 'fulfilled' ? await results[4].value.json() : []
 
       // Log any failed queries for debugging
       for (let i = 0; i < results.length; i++) {
         if (results[i].status === 'rejected') {
-          const labels = ['tokenCurrent', 'tokenPrevious', 'topSkills', 'skillUsers']
+          const labels = ['tokenCurrent', 'tokenPrevious', 'topSkills', 'invocationLeaders', 'skillUsers']
           console.error(`Leaderboard ${labels[i]} query failed:`, (results[i] as PromiseRejectedResult).reason)
         }
       }
@@ -219,6 +252,7 @@ export async function GET(req: Request) {
       const tokenData = tokenDataRaw as { user_id: string; user_email: string; total_tokens: string }[]
       const previousTokenData = previousTokenDataRaw as { user_id: string; user_email: string; total_tokens: string }[]
       const skillData = skillDataRaw as { skill_name: string; usage_count: string; user_count: string }[]
+      const invocationData = invocationDataRaw as { user_id: string; user_email: string; source: string; total_invocations: string }[]
       const skillUsersData = skillUsersDataRaw as { skill_name: string; user_id: string; user_email: string; usage_count: string }[]
 
       // Collect all user_ids for name/email lookup
@@ -232,11 +266,14 @@ export async function GET(req: Request) {
       for (const row of skillUsersData) {
         if (row.user_id) allUserIds.add(row.user_id)
       }
+      for (const row of invocationData) {
+        if (row.user_id) allUserIds.add(row.user_id)
+      }
 
       // === Name Resolution (Zeude Identity SSOT) ===
       // Shared utility handles Supabase lookup + email fallback + error handling
       const supabase = createServerClient()
-      const allRows = [...tokenData, ...previousTokenData, ...skillUsersData]
+      const allRows = [...tokenData, ...previousTokenData, ...skillUsersData, ...invocationData]
       const { getDisplayName } = await resolveUserNames(supabase, allRows)
 
       // Format token leaderboard
@@ -292,6 +329,15 @@ export async function GET(req: Request) {
         }
       }
 
+      // Format invocation leaderboard (copilot + opencode)
+      const topInvocationUsers: InvocationLeader[] = invocationData.map((row, index) => ({
+        rank: index + 1,
+        userName: getDisplayName(row.user_id, row.user_email),
+        userId: row.user_id,
+        source: row.source,
+        invocations: parseInt(row.total_invocations) || 0,
+      }))
+
       const topSkills = skillData.map((row, index) => ({
         rank: index + 1,
         skillName: row.skill_name,
@@ -305,6 +351,7 @@ export async function GET(req: Request) {
       const response: LeaderboardResponse = {
         topTokenUsers,
         previousTopTokenUsers,
+        topInvocationUsers: topInvocationUsers.length > 0 ? topInvocationUsers : undefined,
         topSkills,
         weekWindow: {
           currentStart: new Date(tokenCurrentStartUtcMs).toISOString(),

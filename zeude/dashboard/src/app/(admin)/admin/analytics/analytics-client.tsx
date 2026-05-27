@@ -244,7 +244,7 @@ export default function AnalyticsClient() {
         <div>
           <h1 className="text-3xl font-bold">Token Analytics</h1>
           <p className="text-muted-foreground">
-            Monitor token usage and efficiency across your team (Claude Code &amp; Codex)
+            Monitor token usage and efficiency across your team (Claude Code, Codex, Copilot &amp; OpenCode)
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -360,13 +360,13 @@ export default function AnalyticsClient() {
         </Card>
       </div>
 
-      {/* Source Comparison: Claude Code vs Codex */}
+      {/* Source Comparison: All Sources */}
       {sourceBreakdown.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Source Comparison: Claude Code vs Codex</CardTitle>
+            <CardTitle className="text-lg">Source Breakdown: All Tools</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Side-by-side comparison of usage across AI coding tools
+              Usage across Claude Code, Codex, GitHub Copilot, and OpenCode
             </p>
           </CardHeader>
           <CardContent>
@@ -413,18 +413,20 @@ export default function AnalyticsClient() {
                 ))}
               </div>
 
-              {/* Requests by source */}
+              {/* Requests / Invocations by source */}
               <div className="space-y-2">
-                <div className="text-xs font-medium text-muted-foreground uppercase">Requests</div>
-                {sourceBreakdown.map((sb) => (
-                  <div key={`req-${sb.source}`} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${SOURCE_DOT_COLORS[sb.source] ?? SOURCE_DOT_COLORS_DEFAULT}`} />
-                      <span className="text-sm capitalize">{sb.source || 'unknown'}</span>
+                <div className="text-xs font-medium text-muted-foreground uppercase">Requests / Invocations</div>
+                {sourceBreakdown.map((sb) => {
+                  return (
+                    <div key={`req-${sb.source}`} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${SOURCE_DOT_COLORS[sb.source] ?? SOURCE_DOT_COLORS_DEFAULT}`} />
+                        <span className="text-sm capitalize">{sb.source || 'unknown'}</span>
+                      </div>
+                      <span className="font-mono text-sm">{sb.requestCount.toLocaleString()}</span>
                     </div>
-                    <span className="font-mono text-sm">{sb.requestCount.toLocaleString()}</span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 
@@ -452,6 +454,7 @@ export default function AnalyticsClient() {
                   <div className="flex justify-between mt-1">
                     {sourceBreakdown.map((sb) => {
                       const pct = ((sb.inputTokens + sb.outputTokens) / totalTokens) * 100
+                      if (pct === 0) return null
                       return (
                         <span key={`label-${sb.source}`} className="text-xs text-muted-foreground">
                           <span className={`inline-block w-2 h-2 rounded-full mr-1 ${SOURCE_DOT_COLORS[sb.source] ?? SOURCE_DOT_COLORS_DEFAULT}`} />
@@ -909,7 +912,7 @@ export default function AnalyticsClient() {
                         {skill.count.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground text-sm hidden sm:table-cell">
-                        {new Date(skill.last_used).toLocaleDateString()}
+                        {new Date(skill.last_used).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}
                       </TableCell>
                     </TableRow>
                   ))}

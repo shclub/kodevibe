@@ -470,7 +470,7 @@ export default function HooksClient() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {detail.lastCheckedAt
-                          ? new Date(detail.lastCheckedAt).toLocaleDateString()
+                          ? new Date(detail.lastCheckedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })
                           : 'Never'}
                       </TableCell>
                     </TableRow>

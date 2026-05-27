@@ -20,8 +20,7 @@ export default async function AdminLayout({
       {/* Sidebar */}
       <aside className="w-64 border-r bg-muted/30 p-4 flex flex-col">
         <div className="flex items-center gap-2 mb-6">
-          <img src="/Zep-logo-full.svg" alt="Zeude" className="h-8" />
-          <span className="text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded">Admin</span>
+          <img src="/kodecrew.jpg" alt="kode:crew" className="h-14" />
         </div>
 
         <AdminNav isAdmin={isAdmin} />

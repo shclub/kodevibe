@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import Link from 'next/link'
 import type { SessionSummary } from '@/lib/clickhouse'
 
 interface RecentSessionsProps {
@@ -61,9 +62,11 @@ export function RecentSessions({ sessions }: RecentSessionsProps) {
           </TableHeader>
           <TableBody>
             {sessions.map((session) => (
-              <TableRow key={session.session_id}>
+              <TableRow key={session.session_id} className="cursor-pointer hover:bg-muted/50">
                 <TableCell className="font-medium">
-                  {formatTime(session.started_at)}
+                  <Link href={`/sessions/${session.session_id}`} className="hover:underline text-blue-600">
+                    {formatTime(session.started_at)}
+                  </Link>
                 </TableCell>
                 <TableCell>
                   <Badge variant="secondary">

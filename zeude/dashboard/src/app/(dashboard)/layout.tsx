@@ -21,7 +21,7 @@ export default async function DashboardLayout({
       {/* Sidebar */}
       <aside className="w-64 border-r bg-muted/30 p-4 flex flex-col">
         <div className="flex items-center gap-2 mb-6">
-          <img src="/Zep-logo-full.svg" alt="Zeude" className="h-8" />
+          <img src="/kodecrew.jpg" alt="kode:crew" className="h-14" />
         </div>
 
         <DashboardNav isAdmin={isAdmin} />

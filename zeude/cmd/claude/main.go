@@ -194,9 +194,9 @@ func injectTelemetryEnv(syncResult mcpconfig.SyncResult) {
 	// Configure OTel protocol and exporters
 	// Use http/protobuf instead of grpc for better compatibility
 	otelenv.SetEnvIfEmpty("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
-	otelenv.SetEnvIfEmpty("OTEL_METRICS_EXPORTER", "otlp")
 	otelenv.SetEnvIfEmpty("OTEL_LOGS_EXPORTER", "otlp")
 	otelenv.SetEnvIfEmpty("OTEL_TRACES_EXPORTER", "otlp")
+	otelenv.SetEnvIfEmpty("OTEL_LOG_USER_PROMPTS", "1")
 
 	// Inject Zeude user info as OTEL resource attributes
 	// This helps identify Bedrock users who don't have email in native telemetry

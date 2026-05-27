@@ -2,34 +2,39 @@
 # This file is for local dashboard-only development
 
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
 # Dummy env vars for build-time validation (real values injected at runtime)
 ENV POSTGRES_PASSWORD=build-placeholder \
-    CLICKHOUSE_PASSWORD=build-placeholder
+    CLICKHOUSE_PASSWORD=build-placeholder \
+    NEXT_TELEMETRY_DISABLED=1
 
-# Install dependencies
+# Install pnpm (single small package - avoids npm OOM on large installs)
+RUN npm install -g pnpm --no-audit --no-fund
+
+# Install project dependencies via pnpm (content-addressable, memory-efficient)
 COPY package*.json ./
-RUN npm ci
+RUN pnpm install --no-frozen-lockfile
 
 # Copy source and build
 COPY . .
 
 # Build with standalone output
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
-FROM node:20-alpine AS runner
+FROM node:22-slim AS runner
 
 WORKDIR /app
 
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1
 
 # Create non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
 # Copy built assets
 COPY --from=builder /app/public ./public

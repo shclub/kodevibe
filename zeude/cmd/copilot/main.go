@@ -3,8 +3,10 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -57,6 +59,16 @@ func main() {
 		}
 	}
 
+	// 3. Write Copilot hooks
+	if syncResult.Success && len(syncResult.Hooks) > 0 {
+		agentKey := getAgentKey()
+		if agentKey != "" {
+			if err := mcpconfig.SyncCopilotHooks(syncResult.Hooks, agentKey, getDashboardURL()); err != nil {
+				fmt.Fprintf(os.Stderr, "[%s] warning: copilot hooks sync failed: %v\n", prefix, err)
+			}
+		}
+	}
+
 	// 3. Find real copilot binary
 	realCopilot, err := resolver.FindRealBinaryByName("copilot")
 	if err != nil {
@@ -96,6 +108,7 @@ func main() {
 	if model == "" {
 		model = mcpconfig.GetCopilotModel()
 	}
+	sessionID := generateUUID()
 	otlplog.SendSessionStart(otlplog.SessionStartParams{
 		Endpoint:  config.GetCollectorEndpoint(config.DefaultCollectorEndpoint),
 		Service:   "copilot",
@@ -103,6 +116,7 @@ func main() {
 		UserEmail: syncResult.UserEmail,
 		Team:      syncResult.Team,
 		Model:     model,
+		SessionID: sessionID,
 	})
 
 	// 8. Background sync
@@ -110,11 +124,39 @@ func main() {
 		mcpconfig.BackgroundSync()
 	}
 
-	// 9. Exec real copilot
-	if err := execBinary(realCopilot, os.Args, os.Environ()); err != nil {
-		fmt.Fprintf(os.Stderr, "[%s] failed to exec copilot: %v\n", prefix, err)
+	// Record start time before running copilot so we can find sessions created during this invocation.
+	sessionStartMs := time.Now().UnixMilli() - 2000
+	endpoint := config.GetCollectorEndpoint(config.DefaultCollectorEndpoint)
+
+	// 8.5 Start real-time session watcher (polls events.jsonl every 500ms)
+	summary := &sessionSummary{}
+	watcherStop := make(chan struct{})
+	watcherDone := make(chan struct{})
+	go func() {
+		watchCopilotSessions(syncResult, endpoint, sessionStartMs, watcherStop, summary)
+		close(watcherDone)
+	}()
+
+	// 9. Run real copilot as subprocess (not exec/replace) so we can read session data after it exits
+	exitCode, err := execBinary(realCopilot, os.Args, os.Environ())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[%s] failed to run copilot: %v\n", prefix, err)
 		os.Exit(1)
 	}
+
+	// 10. Stop watcher and wait for final read
+	close(watcherStop)
+	select {
+	case <-watcherDone:
+	case <-time.After(5 * time.Second):
+	}
+
+	// 11. Show session summary
+	if showBanner {
+		printSessionSummary(summary, prefix)
+	}
+
+	os.Exit(exitCode)
 }
 
 func isBackgroundSyncMode() bool {
@@ -207,4 +249,69 @@ func getModelFromArgs() string {
 		}
 	}
 	return ""
+}
+
+// getDashboardURL returns the dashboard URL from env, config file, or default.
+func getDashboardURL() string {
+	if url := os.Getenv("ZEUDE_DASHBOARD_URL"); url != "" {
+		return strings.TrimSuffix(url, "/")
+	}
+	// Read from ~/.zeude/config (dashboard_url= line)
+	home, err := os.UserHomeDir()
+	if err == nil {
+		if data, err := os.ReadFile(filepath.Join(home, ".zeude", "config")); err == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				if strings.HasPrefix(line, "dashboard_url=") {
+					if url := strings.TrimSpace(strings.TrimPrefix(line, "dashboard_url=")); url != "" {
+						return strings.TrimSuffix(url, "/")
+					}
+				}
+			}
+		}
+	}
+	return config.DefaultDashboardURL
+}
+
+// getAgentKey reads the agent key from ~/.zeude/credentials.
+func getAgentKey() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	credPath := filepath.Join(home, ".zeude", "credentials")
+	data, err := os.ReadFile(credPath)
+	if err != nil {
+		return ""
+	}
+
+	// Parse credentials file (format: agent_key=zd_xxx)
+	content := strings.ReplaceAll(string(data), "\r\n", "\n")
+	content = strings.ReplaceAll(content, "\r", "\n")
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "agent_key=") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "agent_key="))
+		}
+		// Also handle "agent_key = value" format
+		if strings.HasPrefix(line, "agent_key") {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				return strings.TrimSpace(parts[1])
+			}
+		}
+	}
+
+	return ""
+}
+
+// generateUUID creates a v4 UUID using crypto/rand.
+func generateUUID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }

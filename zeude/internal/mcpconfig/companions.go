@@ -203,3 +203,70 @@ func GetOpencodeModel() string {
 	}
 	return ""
 }
+
+// SyncCopilotHooks writes Zeude-managed hooks into ~/.copilot/hooks/zeude.json.
+// Copilot hook format: { "version": 1, "hooks": { "eventName": [{"type": "http", "url": "..."}] } }
+func SyncCopilotHooks(hooks []Hook, agentKey, dashboardURL string) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	hooksDir := filepath.Join(home, ".copilot", "hooks")
+	if err := os.MkdirAll(hooksDir, 0755); err != nil {
+		return err
+	}
+
+	// Build hooks config
+	type copilotHook struct {
+		Type       string `json:"type"`
+		URL        string `json:"url,omitempty"`
+		Bash       string `json:"bash,omitempty"`
+		TimeoutSec int    `json:"timeoutSec,omitempty"`
+	}
+
+	hooksConfig := map[string][]copilotHook{}
+
+	for _, hook := range hooks {
+		// Convert Zeude hook events to Copilot hook events
+		copilotEvent := ""
+		switch hook.Event {
+		case "UserPromptSubmit":
+			copilotEvent = "userPromptSubmitted"
+		case "PreToolUse":
+			copilotEvent = "preToolUse"
+		case "PostToolUse":
+			copilotEvent = "postToolUse"
+		case "Stop":
+			copilotEvent = "sessionEnd"
+		case "Notification":
+			copilotEvent = "notification"
+		case "SubagentStop":
+			copilotEvent = "subagentStop"
+		default:
+			// Skip unknown events
+			continue
+		}
+
+		// Create HTTP hook that posts to zeude server
+		hooksConfig[copilotEvent] = append(hooksConfig[copilotEvent], copilotHook{
+			Type:       "http",
+			URL:        fmt.Sprintf("%s/api/hook/copilot", dashboardURL),
+			TimeoutSec: 5,
+		})
+	}
+
+	// Build final config
+	config := map[string]interface{}{
+		"version": 1,
+		"hooks":   hooksConfig,
+	}
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	configPath := filepath.Join(hooksDir, "zeude.json")
+	return writeFileAtomic(configPath, data, 0644)
+}

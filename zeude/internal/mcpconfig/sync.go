@@ -2033,6 +2033,7 @@ type SyncResult struct {
 	Banner      string
 	Prefix      string
 	MCPServers  map[string]MCPServer
+	Hooks       []Hook              // Hooks for Copilot CLI
 	Success     bool
 	ServerCount int
 	SkillCount  int
@@ -2140,6 +2141,7 @@ func doSync(mode syncMode) SyncResult {
 		Banner:      config.Banner,
 		Prefix:      config.Prefix,
 		MCPServers:  config.MCPServers,
+		Hooks:       config.Hooks,
 		Success:     true,
 		ServerCount: len(config.MCPServers),
 		SkillCount:  len(config.Skills),

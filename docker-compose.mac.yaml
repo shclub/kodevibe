@@ -62,7 +62,7 @@ services:
   dashboard:
     build:
       context: ./zeude/dashboard
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.standalone
     container_name: zeude-dashboard
     ports:
       - "3000:3000"

@@ -19,9 +19,18 @@ interface SkillLeaderboardEntry {
   formattedValue: string
 }
 
+interface InvocationLeader {
+  rank: number
+  userName: string
+  userId: string
+  source: string
+  invocations: number
+}
+
 interface LeaderboardData {
   topTokenUsers: LeaderboardUser[]
   previousTopTokenUsers: LeaderboardUser[]
+  topInvocationUsers?: InvocationLeader[]
   topSkills: SkillLeaderboardEntry[]
   weekWindow: {
     currentStart: string
