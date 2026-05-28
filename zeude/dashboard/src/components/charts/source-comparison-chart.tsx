@@ -101,7 +101,7 @@ export const SourceComparisonChart = memo(function SourceComparisonChart({ data,
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `$${v.toFixed(2)}`} />
+                <YAxis width={55} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `$${v.toFixed(2)}`} />
                 <Tooltip
                   contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
                   formatter={(value, name) => [`$${Number(value).toFixed(4)}`, SOURCE_LABELS[String(name).replace('_cost', '')] ?? String(name)]}
@@ -142,7 +142,7 @@ export const SourceComparisonChart = memo(function SourceComparisonChart({ data,
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatNumber} />
+              <YAxis width={55} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatNumber} />
               <Tooltip
                 contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
                 formatter={(value, name) => {
