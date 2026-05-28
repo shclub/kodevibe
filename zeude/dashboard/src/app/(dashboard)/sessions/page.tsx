@@ -11,6 +11,7 @@ import { SourceFilter as SourceFilterComponent } from '@/components/dashboard/so
 import { DateFilter } from '@/components/dashboard/date-filter'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import TopDurationSessions from '@/components/dashboard/top-duration-sessions'
 
 const SOURCE_COLORS: Record<string, string> = {
   claude: 'bg-blue-100 text-blue-800',
@@ -182,6 +183,8 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
           )}
         </CardContent>
       </Card>
+
+      <TopDurationSessions />
     </div>
   )
 }

@@ -482,3 +482,50 @@ export async function getSessionDetails(userEmail: string, userId: string, sessi
   })
   return result.json()
 }
+
+export interface TopDurationSession {
+  session_id: string
+  user_email: string
+  source: string
+  started_at: string
+  ended_at: string
+  duration_seconds: number
+  event_count: number
+  input_tokens: number
+  output_tokens: number
+  total_cost: number
+}
+
+export async function getTopSessionsByDuration(from?: string, to?: string): Promise<TopDurationSession[]> {
+  const dateFilter = buildDateFilter(from, to)
+  const result = await clickhouse.query({
+    query: `
+      SELECT
+        LogAttributes['session.id'] as session_id,
+        any(ResourceAttributes['zeude.user.email']) as user_email,
+        multiIf(
+          any(ServiceName) ILIKE 'codex%', 'codex',
+          any(ServiceName) ILIKE 'opencode%', 'opencode',
+          any(ServiceName) ILIKE 'copilot%', 'copilot',
+          'claude'
+        ) as source,
+        min(Timestamp) as started_at,
+        max(Timestamp) as ended_at,
+        dateDiff('second', min(Timestamp), max(Timestamp)) as duration_seconds,
+        count() as event_count,
+        ${INPUT_TOKENS_EXPR} as input_tokens,
+        sum(toInt64OrZero(LogAttributes['output_tokens'])) as output_tokens,
+        ${COST_EXPR} as total_cost
+      FROM claude_code_logs
+      ${PRICING_JOIN}
+      WHERE 1=1
+        ${dateFilter}
+      GROUP BY session_id
+      HAVING session_id != '' AND duration_seconds > 0 AND countIf(Body LIKE '%api_request') > 0
+      ORDER BY duration_seconds DESC
+      LIMIT 10
+    `,
+    format: 'JSONEachRow',
+  })
+  return result.json()
+}
