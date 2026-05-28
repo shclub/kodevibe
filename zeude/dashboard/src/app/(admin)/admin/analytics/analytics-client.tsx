@@ -368,7 +368,7 @@ export default function AnalyticsClient() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Cache Hit Rate</CardTitle>
+            <CardTitle className="text-sm font-medium whitespace-nowrap">Cache Hit Rate</CardTitle>
             <Zap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
