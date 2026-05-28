@@ -91,6 +91,8 @@ function SourceBreakdown({ stats }: { stats: SourceStat[] }) {
   )
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function OverviewPage({ searchParams }: OverviewPageProps) {
   const user = await getUser()
   const params = await searchParams

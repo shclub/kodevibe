@@ -63,6 +63,8 @@ interface SessionsPageProps {
   searchParams: Promise<{ source?: string; from?: string; to?: string; viewUser?: string }>
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function SessionsPage({ searchParams }: SessionsPageProps) {
   const user = await getUser()
   const params = await searchParams
