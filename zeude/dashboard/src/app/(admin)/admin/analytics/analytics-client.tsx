@@ -536,26 +536,27 @@ export default function AnalyticsClient() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="h-32 flex items-center justify-center text-muted-foreground">
+            <div className="h-48 flex items-center justify-center text-muted-foreground">
               Loading...
             </div>
           ) : trend.length > 0 ? (
-            <div className="h-32 flex items-end gap-1">
-              {trend.slice(-14).map((point, i) => {
-                const maxInput = Math.max(...trend.slice(-14).map(t => t.inputTokens))
-                const height = (point.inputTokens / maxInput) * 100
-                return (
-                  <div
-                    key={i}
-                    className="flex-1 bg-primary/20 hover:bg-primary/40 transition-colors rounded-t"
-                    style={{ height: `${height}%` }}
-                    title={`${point.date}: ${formatNumber(point.inputTokens)} tokens`}
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={trend.slice(-14).map(t => ({ ...t, date: t.date.slice(5) }))}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatNumber} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                    formatter={(value, name) => [formatNumber(Number(value)), name === 'inputTokens' ? 'Input' : 'Output']}
                   />
-                )
-              })}
+                  <Bar dataKey="inputTokens" name="inputTokens" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="outputTokens" name="outputTokens" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-32 flex items-center justify-center text-muted-foreground">
+            <div className="h-48 flex items-center justify-center text-muted-foreground">
               No data available
             </div>
           )}
