@@ -128,7 +128,7 @@ export default function TopDurationSessions() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10 text-center">#</TableHead>
-                <TableHead>Session</TableHead>
+                <TableHead>Session ID</TableHead>
                 <TableHead>User</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
@@ -146,9 +146,9 @@ export default function TopDurationSessions() {
                     <TableCell className={`text-center font-bold ${getRankStyle(rank)}`}>
                       {rank}
                     </TableCell>
-                    <TableCell className="font-mono text-xs max-w-[200px] truncate" title={s.session_id}>
+                    <TableCell className="font-mono text-xs" title={s.session_id}>
                       <Link href={`/sessions/${s.session_id}`} className="hover:underline text-blue-600">
-                        {s.session_id.length > 16 ? s.session_id.slice(0, 16) + '…' : s.session_id}
+                        {s.session_id.slice(0, 8)}…
                       </Link>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground truncate max-w-[100px]" title={s.user_email}>
