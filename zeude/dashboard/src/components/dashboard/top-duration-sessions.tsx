@@ -133,6 +133,7 @@ export default function TopDurationSessions() {
                 <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Duration</TableHead>
+                <TableHead className="text-right">Total Tokens</TableHead>
                 <TableHead className="text-right">Input Tokens</TableHead>
                 <TableHead className="text-right">Output Tokens</TableHead>
               </TableRow>
@@ -170,6 +171,9 @@ export default function TopDurationSessions() {
                         <Clock className="h-3 w-3 mr-1" />
                         {formatDuration(s.duration_seconds)}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {formatNum(s.input_tokens + s.output_tokens)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
                       {formatNum(s.input_tokens)}
