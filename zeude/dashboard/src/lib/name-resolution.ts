@@ -102,8 +102,10 @@ function buildGetDisplayName(
   userIdToEmail: Map<string, string>
 ): (userId: string, email?: string | null) => string {
   return (userId: string, email?: string | null): string => {
+    // Prefer email prefix to match sessions page display
+    const resolvedEmail = email || userIdToEmail.get(userId)
+    if (resolvedEmail) return resolvedEmail.split('@')[0]
     if (userIdToName.has(userId)) return userIdToName.get(userId)!
-    if (email) return email
-    return userIdToEmail.get(userId) || userId || 'Unknown'
+    return userId || 'Unknown'
   }
 }
