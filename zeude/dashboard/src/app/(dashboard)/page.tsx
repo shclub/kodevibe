@@ -1,22 +1,18 @@
 import { getUser } from '@/lib/session'
 import {
-  getSessionsToday,
   getOverviewStats,
-  getTodayInvocationCount,
   getTodayStatsBySource,
   parseSourceParam,
-  isInvocationOnlySource,
-  type SessionSummary,
   type OverviewStats,
   type SourceStat,
 } from '@/lib/clickhouse'
 import { StatsCard } from '@/components/dashboard/stats-card'
-import { RecentSessions } from '@/components/dashboard/recent-sessions'
 import { SourceFilter as SourceFilterComponent } from '@/components/dashboard/source-filter'
+import { OverviewClient } from '@/components/dashboard/overview-client'
 import { Activity, DollarSign, Hash, Zap } from 'lucide-react'
 
 interface OverviewPageProps {
-  searchParams: Promise<{ source?: string }>
+  searchParams: Promise<{ source?: string; from?: string; to?: string }>
 }
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -54,7 +50,6 @@ function SourceBreakdown({ stats }: { stats: SourceStat[] }) {
         const colors = SOURCE_COLORS[s.source] ?? 'border-gray-200 bg-gray-50'
         const dot = SOURCE_DOT[s.source] ?? 'bg-gray-400'
         const label = SOURCE_LABELS[s.source] ?? s.source
-        // Show invocations view only when there's no token data (transitional: old data before shim upgrade)
         const isInvOnly = s.invocations > 0 && s.input_tokens === 0 && s.output_tokens === 0
 
         return (
@@ -100,38 +95,33 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   const user = await getUser()
   const params = await searchParams
   const source = parseSourceParam(params.source ?? null)
-  const invocationOnly = isInvocationOnlySource(source)
+  const from = params.from
+  const to = params.to
 
-  let sessions: SessionSummary[] = []
   let todayStats: OverviewStats = {
     total_sessions: 0,
     total_cost: 0,
     total_input_tokens: 0,
     total_output_tokens: 0,
   }
-  let extraInvocations = 0
   let sourceStats: SourceStat[] = []
 
   try {
-    if (invocationOnly) {
-      extraInvocations = await getTodayInvocationCount(user.email, user.id, source)
-    } else {
-      const fetches = await Promise.all([
-        getSessionsToday(user.email, user.id, source),
-        getOverviewStats(user.email, user.id, source),
-        source === 'all' ? getTodayInvocationCount(user.email, user.id, 'all') : Promise.resolve(0),
-        source === 'all' ? getTodayStatsBySource(user.email, user.id) : Promise.resolve([]),
-      ])
-      sessions = fetches[0]
-      todayStats = fetches[1]
-      extraInvocations = fetches[2]
-      sourceStats = fetches[3]
-    }
+    const fetches = await Promise.all([
+      getOverviewStats(user.email, user.id, source, from, to),
+      source === 'all' ? getTodayStatsBySource(user.email, user.id, from, to) : Promise.resolve([]),
+    ])
+    todayStats = fetches[0]
+    sourceStats = fetches[1]
   } catch (error) {
     console.error('Failed to fetch ClickHouse data:', error)
   }
 
-  const totalSessions = Number(todayStats.total_sessions) + extraInvocations
+  const dateLabel = from && to
+    ? `${from} ~ ${to}`
+    : from ? `from ${from}`
+    : to ? `until ${to}`
+    : 'today'
 
   return (
     <div className="space-y-8">
@@ -139,41 +129,38 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
         <div>
           <h1 className="text-3xl font-bold">Overview</h1>
           <p className="text-muted-foreground">
-            Your AI coding tool usage for today
+            Your AI coding tool usage ({dateLabel})
           </p>
         </div>
-        <SourceFilterComponent useSearchParams />
+        <div className="flex items-center gap-2">
+          <OverviewClient from={from} to={to} />
+          <SourceFilterComponent useSearchParams />
+        </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 stagger-children">
         <StatsCard
-          title="Sessions Today"
-          value={totalSessions}
+          title="Sessions"
+          value={Number(todayStats.total_sessions)}
           icon={Activity}
-          description={
-            source === 'all' && extraInvocations > 0
-              ? `Claude/Codex sessions + ${extraInvocations} tool invocations`
-              : invocationOnly
-              ? 'Tool invocations'
-              : 'Active coding sessions'
-          }
+          description="Active coding sessions"
         />
         <StatsCard
-          title="Cost Today"
-          value={invocationOnly ? 'N/A' : `$${Number(todayStats.total_cost).toFixed(4)}`}
+          title="Cost"
+          value={`$${Number(todayStats.total_cost).toFixed(4)}`}
           icon={DollarSign}
           description="API usage cost"
         />
         <StatsCard
           title="Input Tokens"
-          value={invocationOnly ? 'N/A' : Number(todayStats.total_input_tokens).toLocaleString()}
+          value={Number(todayStats.total_input_tokens).toLocaleString()}
           icon={Hash}
           description="Prompts and context"
         />
         <StatsCard
           title="Output Tokens"
-          value={invocationOnly ? 'N/A' : Number(todayStats.total_output_tokens).toLocaleString()}
+          value={Number(todayStats.total_output_tokens).toLocaleString()}
           icon={Zap}
           description="Generated responses"
         />
@@ -181,8 +168,6 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
 
       {/* Source Breakdown (only when 'all' is selected) */}
       {source === 'all' && <SourceBreakdown stats={sourceStats} />}
-
-      {!invocationOnly && <RecentSessions sessions={sessions.slice(0, 10)} />}
     </div>
   )
 }

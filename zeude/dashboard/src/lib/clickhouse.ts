@@ -232,8 +232,11 @@ const defaultOverviewStats: OverviewStats = {
   total_output_tokens: 0
 }
 
-async function _getOverviewStats(userEmail: string, userId: string = '', source: SourceFilter = 'all'): Promise<OverviewStats> {
+async function _getOverviewStats(userEmail: string, userId: string = '', source: SourceFilter = 'all', from?: string, to?: string): Promise<OverviewStats> {
   const sourceCondition = buildSourceCondition(source)
+  const dateFilter = from && to
+    ? `AND Timestamp >= '${from}' AND Timestamp < '${to}' + INTERVAL 1 DAY`
+    : `AND Timestamp >= today()`
   const result = await clickhouse.query({
     query: `
       SELECT
@@ -244,7 +247,7 @@ async function _getOverviewStats(userEmail: string, userId: string = '', source:
       FROM claude_code_logs
       ${PRICING_JOIN}
       WHERE ${USER_MATCH_CONDITION}
-        AND Timestamp >= today()
+        ${dateFilter}
         ${sourceCondition}
     `,
     query_params: { userEmail, userId },
@@ -258,9 +261,9 @@ async function _getOverviewStats(userEmail: string, userId: string = '', source:
 }
 
 // 30s cache
-export function getOverviewStats(userEmail: string, userId: string = '', source: SourceFilter = 'all'): Promise<OverviewStats> {
-  const cacheKey = ['overview-stats', userEmail, userId, source]
-  return unstable_cache(_getOverviewStats, cacheKey, { revalidate: 30 })(userEmail, userId, source)
+export function getOverviewStats(userEmail: string, userId: string = '', source: SourceFilter = 'all', from?: string, to?: string): Promise<OverviewStats> {
+  const cacheKey = ['overview-stats', userEmail, userId, source, from ?? 'today', to ?? 'today']
+  return unstable_cache(_getOverviewStats, cacheKey, { revalidate: 30 })(userEmail, userId, source, from, to)
 }
 
 // Per-source breakdown of today's stats (used on overview page when source='all').
@@ -273,7 +276,13 @@ export interface SourceStat {
   invocations: number // copilot/opencode only
 }
 
-async function _getTodayStatsBySource(userEmail: string, userId: string = ''): Promise<SourceStat[]> {
+async function _getTodayStatsBySource(userEmail: string, userId: string = '', from?: string, to?: string): Promise<SourceStat[]> {
+  const dateFilter = from && to
+    ? `AND Timestamp >= '${from}' AND Timestamp < '${to}' + INTERVAL 1 DAY`
+    : `AND Timestamp >= today()`
+  const invDateFilter = from && to
+    ? `AND date >= '${from}' AND date <= '${to}'`
+    : `AND date = today()`
   const [tokenResult, invocationResult] = await Promise.all([
     clickhouse.query({
       query: `
@@ -291,7 +300,7 @@ async function _getTodayStatsBySource(userEmail: string, userId: string = ''): P
         FROM claude_code_logs
         ${PRICING_JOIN}
         WHERE ${USER_MATCH_CONDITION}
-          AND Timestamp >= today()
+          ${dateFilter}
         GROUP BY source
         ORDER BY source
       `,
@@ -303,7 +312,7 @@ async function _getTodayStatsBySource(userEmail: string, userId: string = ''): P
         SELECT source, sum(invocation_count) as invocations
         FROM tool_invocations_daily
         WHERE (user_id = {userId:String} OR user_email = {userEmail:String})
-          AND date = today()
+          ${invDateFilter}
           AND source IN ('copilot', 'opencode')
         GROUP BY source
       `,
@@ -336,9 +345,9 @@ async function _getTodayStatsBySource(userEmail: string, userId: string = ''): P
   return result.sort((a, b) => a.source.localeCompare(b.source))
 }
 
-export function getTodayStatsBySource(userEmail: string, userId: string = ''): Promise<SourceStat[]> {
-  const cacheKey = ['today-stats-by-source', userEmail, userId]
-  return unstable_cache(_getTodayStatsBySource, cacheKey, { revalidate: 30 })(userEmail, userId)
+export function getTodayStatsBySource(userEmail: string, userId: string = '', from?: string, to?: string): Promise<SourceStat[]> {
+  const cacheKey = ['today-stats-by-source', userEmail, userId, from ?? 'today', to ?? 'today']
+  return unstable_cache(_getTodayStatsBySource, cacheKey, { revalidate: 30 })(userEmail, userId, from, to)
 }
 
 // Today's invocation count from tool_invocations_daily for invocation-only sources.
