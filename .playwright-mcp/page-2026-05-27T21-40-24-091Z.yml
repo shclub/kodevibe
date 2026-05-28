@@ -1,0 +1,7 @@
+- generic [ref=e3]:
+  - heading "Authentication Failed" [level=1] [ref=e4]
+  - paragraph [ref=e5]: Invalid or expired authentication token.
+  - paragraph [ref=e6]:
+    - text: Run
+    - code [ref=e7]: /zeude
+    - text: in Claude Code to authenticate.

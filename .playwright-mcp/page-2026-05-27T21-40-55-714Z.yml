@@ -1,0 +1,262 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - img "kode:crew" [ref=e5]
+    - navigation [ref=e6]:
+      - link "Overview" [ref=e7] [cursor=pointer]:
+        - /url: /
+        - img [ref=e8]
+        - text: Overview
+      - link "Sessions" [ref=e13] [cursor=pointer]:
+        - /url: /sessions
+        - img [ref=e14]
+        - text: Sessions
+      - link "Daily Stats" [ref=e18] [cursor=pointer]:
+        - /url: /daily
+        - img [ref=e19]
+        - text: Daily Stats
+      - link "Prompts" [ref=e21] [cursor=pointer]:
+        - /url: /prompts
+        - img [ref=e22]
+        - text: Prompts
+      - link "Leaderboard" [ref=e24] [cursor=pointer]:
+        - /url: /leaderboard
+        - img [ref=e25]
+        - text: Leaderboard
+      - link "My Skills" [ref=e31] [cursor=pointer]:
+        - /url: /skills
+        - img [ref=e32]
+        - text: My Skills
+      - generic [ref=e34]: Workspace
+      - link "Hooks" [ref=e35] [cursor=pointer]:
+        - /url: /admin/hooks
+        - img [ref=e36]
+        - text: Hooks
+      - link "MCP Servers" [ref=e38] [cursor=pointer]:
+        - /url: /admin/mcp
+        - img [ref=e39]
+        - text: MCP Servers
+      - link "Skills" [ref=e42] [cursor=pointer]:
+        - /url: /admin/skills
+        - img [ref=e43]
+        - text: Skills
+      - link "Agents" [ref=e45] [cursor=pointer]:
+        - /url: /admin/agents
+        - img [ref=e46]
+        - text: Agents
+      - generic [ref=e49]: Admin
+      - link "Team" [ref=e50] [cursor=pointer]:
+        - /url: /admin/team
+        - img [ref=e51]
+        - text: Team
+      - link "Analytics" [ref=e56] [cursor=pointer]:
+        - /url: /admin/analytics
+        - img [ref=e57]
+        - text: Analytics
+      - button "Logout" [ref=e61]:
+        - img [ref=e62]
+        - text: Logout
+    - generic [ref=e66]:
+      - generic [ref=e68]: JL
+      - generic [ref=e69]:
+        - generic [ref=e70]: Jake Lee
+        - generic [ref=e71]: shclub@gmail.com
+  - main [ref=e72]:
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - heading "Sessions" [level=1] [ref=e77]
+          - paragraph [ref=e78]: Browse your coding sessions
+        - generic [ref=e79]:
+          - button "All" [ref=e80]
+          - button "Claude Code" [ref=e81]
+          - button "Codex" [ref=e82]
+          - button "Copilot" [ref=e83]
+          - button "OpenCode" [ref=e84]
+      - generic [ref=e85]:
+        - generic [ref=e86]:
+          - generic [ref=e87]: Today's Sessions
+          - generic [ref=e88]: 10 sessions recorded today
+        - table [ref=e91]:
+          - rowgroup [ref=e92]:
+            - row "Session ID User Source Started Duration Events Input Tokens Output Tokens Premium Req Cost" [ref=e93]:
+              - columnheader "Session ID" [ref=e94]
+              - columnheader "User" [ref=e95]
+              - columnheader "Source" [ref=e96]
+              - columnheader "Started" [ref=e97]
+              - columnheader "Duration" [ref=e98]
+              - columnheader "Events" [ref=e99]
+              - columnheader "Input Tokens" [ref=e100]
+              - columnheader "Output Tokens" [ref=e101]
+              - columnheader "Premium Req" [ref=e102]
+              - columnheader "Cost" [ref=e103]
+          - rowgroup [ref=e104]:
+            - row "4ea7bdbe… shclub@gmail.com Copilot 01:03:22 AM 28s 2 24,933 24 30 $0.0000" [ref=e105] [cursor=pointer]:
+              - cell "4ea7bdbe…" [ref=e106]:
+                - link "4ea7bdbe…" [ref=e107]:
+                  - /url: /sessions/4ea7bdbe-326e-4c2e-bc2d-dfb373400962
+              - cell "shclub@gmail.com" [ref=e108]
+              - cell "Copilot" [ref=e109]:
+                - generic [ref=e110]: Copilot
+              - cell "01:03:22 AM" [ref=e111]:
+                - link "01:03:22 AM" [ref=e112]:
+                  - /url: /sessions/4ea7bdbe-326e-4c2e-bc2d-dfb373400962
+              - cell "28s" [ref=e113]:
+                - generic [ref=e114]: 28s
+              - cell "2" [ref=e115]
+              - cell "24,933" [ref=e116]
+              - cell "24" [ref=e117]
+              - cell "30" [ref=e118]
+              - cell "$0.0000" [ref=e119]
+            - row "b13563fd… shclub@gmail.com Copilot 12:49:12 AM 4m 9 0 5,346 — $0.0000" [ref=e120] [cursor=pointer]:
+              - cell "b13563fd…" [ref=e121]:
+                - link "b13563fd…" [ref=e122]:
+                  - /url: /sessions/b13563fd-c84d-461f-b8f3-06c158fd3d1a
+              - cell "shclub@gmail.com" [ref=e123]
+              - cell "Copilot" [ref=e124]:
+                - generic [ref=e125]: Copilot
+              - cell "12:49:12 AM" [ref=e126]:
+                - link "12:49:12 AM" [ref=e127]:
+                  - /url: /sessions/b13563fd-c84d-461f-b8f3-06c158fd3d1a
+              - cell "4m" [ref=e128]:
+                - generic [ref=e129]: 4m
+              - cell "9" [ref=e130]
+              - cell "0" [ref=e131]
+              - cell "5,346" [ref=e132]
+              - cell "—" [ref=e133]
+              - cell "$0.0000" [ref=e134]
+            - row "d78413c9… shclub@gmail.com Copilot 12:30:09 AM 18m 14 31,914 15,023 — $0.0000" [ref=e135] [cursor=pointer]:
+              - cell "d78413c9…" [ref=e136]:
+                - link "d78413c9…" [ref=e137]:
+                  - /url: /sessions/d78413c9-ab4e-4fc4-b7f8-03c0ee216070
+              - cell "shclub@gmail.com" [ref=e138]
+              - cell "Copilot" [ref=e139]:
+                - generic [ref=e140]: Copilot
+              - cell "12:30:09 AM" [ref=e141]:
+                - link "12:30:09 AM" [ref=e142]:
+                  - /url: /sessions/d78413c9-ab4e-4fc4-b7f8-03c0ee216070
+              - cell "18m" [ref=e143]:
+                - generic [ref=e144]: 18m
+              - cell "14" [ref=e145]
+              - cell "31,914" [ref=e146]
+              - cell "15,023" [ref=e147]
+              - cell "—" [ref=e148]
+              - cell "$0.0000" [ref=e149]
+            - row "a521b505… shclub@gmail.com Copilot 12:16:55 AM 0s 1 0 12 — $0.0000" [ref=e150] [cursor=pointer]:
+              - cell "a521b505…" [ref=e151]:
+                - link "a521b505…" [ref=e152]:
+                  - /url: /sessions/a521b505-8e55-477f-aa93-0f03c0c8c21c
+              - cell "shclub@gmail.com" [ref=e153]
+              - cell "Copilot" [ref=e154]:
+                - generic [ref=e155]: Copilot
+              - cell "12:16:55 AM" [ref=e156]:
+                - link "12:16:55 AM" [ref=e157]:
+                  - /url: /sessions/a521b505-8e55-477f-aa93-0f03c0c8c21c
+              - cell "0s" [ref=e158]:
+                - generic [ref=e159]: 0s
+              - cell "1" [ref=e160]
+              - cell "0" [ref=e161]
+              - cell "12" [ref=e162]
+              - cell "—" [ref=e163]
+              - cell "$0.0000" [ref=e164]
+            - row "5cd7054e… shclub@gmail.com Copilot 12:16:40 AM 0s 1 10,553 12 — $0.0000" [ref=e165] [cursor=pointer]:
+              - cell "5cd7054e…" [ref=e166]:
+                - link "5cd7054e…" [ref=e167]:
+                  - /url: /sessions/5cd7054e-592c-4f6d-8215-b9a27699946f
+              - cell "shclub@gmail.com" [ref=e168]
+              - cell "Copilot" [ref=e169]:
+                - generic [ref=e170]: Copilot
+              - cell "12:16:40 AM" [ref=e171]:
+                - link "12:16:40 AM" [ref=e172]:
+                  - /url: /sessions/5cd7054e-592c-4f6d-8215-b9a27699946f
+              - cell "0s" [ref=e173]:
+                - generic [ref=e174]: 0s
+              - cell "1" [ref=e175]
+              - cell "10,553" [ref=e176]
+              - cell "12" [ref=e177]
+              - cell "—" [ref=e178]
+              - cell "$0.0000" [ref=e179]
+            - row "11c10116… shclub@gmail.com Copilot 12:08:18 AM 0s 1 10,552 13 — $0.0000" [ref=e180] [cursor=pointer]:
+              - cell "11c10116…" [ref=e181]:
+                - link "11c10116…" [ref=e182]:
+                  - /url: /sessions/11c10116-6f0c-499a-842a-0fcf22972942
+              - cell "shclub@gmail.com" [ref=e183]
+              - cell "Copilot" [ref=e184]:
+                - generic [ref=e185]: Copilot
+              - cell "12:08:18 AM" [ref=e186]:
+                - link "12:08:18 AM" [ref=e187]:
+                  - /url: /sessions/11c10116-6f0c-499a-842a-0fcf22972942
+              - cell "0s" [ref=e188]:
+                - generic [ref=e189]: 0s
+              - cell "1" [ref=e190]
+              - cell "10,552" [ref=e191]
+              - cell "13" [ref=e192]
+              - cell "—" [ref=e193]
+              - cell "$0.0000" [ref=e194]
+            - row "ses_1963… shclub@gmail.com OpenCode 11:17:35 PM 4s 5 34 22 — $0.0000" [ref=e195] [cursor=pointer]:
+              - cell "ses_1963…" [ref=e196]:
+                - link "ses_1963…" [ref=e197]:
+                  - /url: /sessions/ses_19633b979ffeuFJuGje4Uz3PNX
+              - cell "shclub@gmail.com" [ref=e198]
+              - cell "OpenCode" [ref=e199]:
+                - generic [ref=e200]: OpenCode
+              - cell "11:17:35 PM" [ref=e201]:
+                - link "11:17:35 PM" [ref=e202]:
+                  - /url: /sessions/ses_19633b979ffeuFJuGje4Uz3PNX
+              - cell "4s" [ref=e203]:
+                - generic [ref=e204]: 4s
+              - cell "5" [ref=e205]
+              - cell "34" [ref=e206]
+              - cell "22" [ref=e207]
+              - cell "—" [ref=e208]
+              - cell "$0.0000" [ref=e209]
+            - row "ses_1963… shclub@gmail.com OpenCode 11:07:15 PM 5s 4 8,081 11 — $0.0000" [ref=e210] [cursor=pointer]:
+              - cell "ses_1963…" [ref=e211]:
+                - link "ses_1963…" [ref=e212]:
+                  - /url: /sessions/ses_1963d300bffe7wroY16E2Mn825
+              - cell "shclub@gmail.com" [ref=e213]
+              - cell "OpenCode" [ref=e214]:
+                - generic [ref=e215]: OpenCode
+              - cell "11:07:15 PM" [ref=e216]:
+                - link "11:07:15 PM" [ref=e217]:
+                  - /url: /sessions/ses_1963d300bffe7wroY16E2Mn825
+              - cell "5s" [ref=e218]:
+                - generic [ref=e219]: 5s
+              - cell "4" [ref=e220]
+              - cell "8,081" [ref=e221]
+              - cell "11" [ref=e222]
+              - cell "—" [ref=e223]
+              - cell "$0.0000" [ref=e224]
+            - row "ses_1965… shclub@gmail.com OpenCode 10:32:41 PM 4s 4 17 11 — $0.0000" [ref=e225] [cursor=pointer]:
+              - cell "ses_1965…" [ref=e226]:
+                - link "ses_1965…" [ref=e227]:
+                  - /url: /sessions/ses_1965cd4b6ffeMPfx7CRspeOeDP
+              - cell "shclub@gmail.com" [ref=e228]
+              - cell "OpenCode" [ref=e229]:
+                - generic [ref=e230]: OpenCode
+              - cell "10:32:41 PM" [ref=e231]:
+                - link "10:32:41 PM" [ref=e232]:
+                  - /url: /sessions/ses_1965cd4b6ffeMPfx7CRspeOeDP
+              - cell "4s" [ref=e233]:
+                - generic [ref=e234]: 4s
+              - cell "4" [ref=e235]
+              - cell "17" [ref=e236]
+              - cell "11" [ref=e237]
+              - cell "—" [ref=e238]
+              - cell "$0.0000" [ref=e239]
+            - row "ses_1967… shclub@gmail.com OpenCode 10:06:01 PM 16m 7 8,125 22 — $0.0000" [ref=e240] [cursor=pointer]:
+              - cell "ses_1967…" [ref=e241]:
+                - link "ses_1967…" [ref=e242]:
+                  - /url: /sessions/ses_196753db3ffel2IH1NRQeAq3Rq
+              - cell "shclub@gmail.com" [ref=e243]
+              - cell "OpenCode" [ref=e244]:
+                - generic [ref=e245]: OpenCode
+              - cell "10:06:01 PM" [ref=e246]:
+                - link "10:06:01 PM" [ref=e247]:
+                  - /url: /sessions/ses_196753db3ffel2IH1NRQeAq3Rq
+              - cell "16m" [ref=e248]:
+                - generic [ref=e249]: 16m
+              - cell "7" [ref=e250]
+              - cell "8,125" [ref=e251]
+              - cell "22" [ref=e252]
+              - cell "—" [ref=e253]
+              - cell "$0.0000" [ref=e254]

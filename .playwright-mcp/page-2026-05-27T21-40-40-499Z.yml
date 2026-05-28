@@ -1,0 +1,258 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - img "kode:crew" [ref=e5]
+    - navigation [ref=e6]:
+      - link "Overview" [ref=e7] [cursor=pointer]:
+        - /url: /
+        - img [ref=e8]
+        - text: Overview
+      - link "Sessions" [ref=e13] [cursor=pointer]:
+        - /url: /sessions
+        - img [ref=e14]
+        - text: Sessions
+      - link "Daily Stats" [ref=e18] [cursor=pointer]:
+        - /url: /daily
+        - img [ref=e19]
+        - text: Daily Stats
+      - link "Prompts" [ref=e21] [cursor=pointer]:
+        - /url: /prompts
+        - img [ref=e22]
+        - text: Prompts
+      - link "Leaderboard" [ref=e24] [cursor=pointer]:
+        - /url: /leaderboard
+        - img [ref=e25]
+        - text: Leaderboard
+      - link "My Skills" [ref=e31] [cursor=pointer]:
+        - /url: /skills
+        - img [ref=e32]
+        - text: My Skills
+      - generic [ref=e34]: Workspace
+      - link "Hooks" [ref=e35] [cursor=pointer]:
+        - /url: /admin/hooks
+        - img [ref=e36]
+        - text: Hooks
+      - link "MCP Servers" [ref=e38] [cursor=pointer]:
+        - /url: /admin/mcp
+        - img [ref=e39]
+        - text: MCP Servers
+      - link "Skills" [ref=e42] [cursor=pointer]:
+        - /url: /admin/skills
+        - img [ref=e43]
+        - text: Skills
+      - link "Agents" [ref=e45] [cursor=pointer]:
+        - /url: /admin/agents
+        - img [ref=e46]
+        - text: Agents
+      - generic [ref=e49]: Admin
+      - link "Team" [ref=e50] [cursor=pointer]:
+        - /url: /admin/team
+        - img [ref=e51]
+        - text: Team
+      - link "Analytics" [ref=e56] [cursor=pointer]:
+        - /url: /admin/analytics
+        - img [ref=e57]
+        - text: Analytics
+      - button "Logout" [ref=e61]:
+        - img [ref=e62]
+        - text: Logout
+    - generic [ref=e66]:
+      - generic [ref=e68]: JL
+      - generic [ref=e69]:
+        - generic [ref=e70]: Jake Lee
+        - generic [ref=e71]: shclub@gmail.com
+  - main [ref=e72]:
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - heading "Overview" [level=1] [ref=e77]
+          - paragraph [ref=e78]: Your AI coding tool usage for today
+        - generic [ref=e79]:
+          - button "All" [ref=e80]
+          - button "Claude Code" [ref=e81]
+          - button "Codex" [ref=e82]
+          - button "Copilot" [ref=e83]
+          - button "OpenCode" [ref=e84]
+      - generic [ref=e85]:
+        - generic [ref=e86]:
+          - generic [ref=e87]:
+            - generic [ref=e88]: Sessions Today
+            - img [ref=e89]
+          - generic [ref=e91]:
+            - generic [ref=e92]: "50"
+            - paragraph [ref=e93]: Claude/Codex sessions + 21 tool invocations
+        - generic [ref=e94]:
+          - generic [ref=e95]:
+            - generic [ref=e96]: Cost Today
+            - img [ref=e97]
+          - generic [ref=e99]:
+            - generic [ref=e100]: $52.5692
+            - paragraph [ref=e101]: API usage cost
+        - generic [ref=e102]:
+          - generic [ref=e103]:
+            - generic [ref=e104]: Input Tokens
+            - img [ref=e105]
+          - generic [ref=e108]:
+            - generic [ref=e109]: 1,189,456
+            - paragraph [ref=e110]: Prompts and context
+        - generic [ref=e111]:
+          - generic [ref=e112]:
+            - generic [ref=e113]: Output Tokens
+            - img [ref=e114]
+          - generic [ref=e116]:
+            - generic [ref=e117]: 494,818
+            - paragraph [ref=e118]: Generated responses
+      - generic [ref=e119]:
+        - generic [ref=e120]:
+          - generic [ref=e123]: Claude Code
+          - generic [ref=e124]:
+            - generic [ref=e125]:
+              - generic [ref=e126]: Sessions
+              - generic [ref=e127]: "11"
+            - generic [ref=e128]:
+              - generic [ref=e129]: Input
+              - generic [ref=e130]: 1.1M
+            - generic [ref=e131]:
+              - generic [ref=e132]: Output
+              - generic [ref=e133]: 474.3K
+            - generic [ref=e134]:
+              - generic [ref=e135]: Cost
+              - generic [ref=e136]: $52.569
+        - generic [ref=e137]:
+          - generic [ref=e140]: GitHub Copilot
+          - generic [ref=e141]:
+            - generic [ref=e142]:
+              - generic [ref=e143]: Sessions
+              - generic [ref=e144]: "12"
+            - generic [ref=e145]:
+              - generic [ref=e146]: Input
+              - generic [ref=e147]: 78.0K
+            - generic [ref=e148]:
+              - generic [ref=e149]: Output
+              - generic [ref=e150]: 20.4K
+            - generic [ref=e151]:
+              - generic [ref=e152]: Cost
+              - generic [ref=e153]: $0.000
+            - generic [ref=e154]:
+              - generic [ref=e155]: Invocations
+              - generic [ref=e156]: "8"
+        - generic [ref=e157]:
+          - generic [ref=e160]: OpenCode
+          - generic [ref=e161]:
+            - generic [ref=e162]:
+              - generic [ref=e163]: Sessions
+              - generic [ref=e164]: "7"
+            - generic [ref=e165]:
+              - generic [ref=e166]: Input
+              - generic [ref=e167]: 16.3K
+            - generic [ref=e168]:
+              - generic [ref=e169]: Output
+              - generic [ref=e170]: "66"
+            - generic [ref=e171]:
+              - generic [ref=e172]: Cost
+              - generic [ref=e173]: $0.000
+            - generic [ref=e174]:
+              - generic [ref=e175]: Invocations
+              - generic [ref=e176]: "13"
+      - generic [ref=e177]:
+        - generic [ref=e178]:
+          - generic [ref=e179]: Recent Sessions
+          - generic [ref=e180]: Your Claude Code sessions from today
+        - table [ref=e183]:
+          - rowgroup [ref=e184]:
+            - row "Time Duration Events Tokens Cost" [ref=e185]:
+              - columnheader "Time" [ref=e186]
+              - columnheader "Duration" [ref=e187]
+              - columnheader "Events" [ref=e188]
+              - columnheader "Tokens" [ref=e189]
+              - columnheader "Cost" [ref=e190]
+          - rowgroup [ref=e191]:
+            - row "04:03 PM 28s 2 24,957 $0.0000" [ref=e192] [cursor=pointer]:
+              - cell "04:03 PM" [ref=e193]:
+                - link "04:03 PM" [ref=e194]:
+                  - /url: /sessions/4ea7bdbe-326e-4c2e-bc2d-dfb373400962
+              - cell "28s" [ref=e195]:
+                - generic [ref=e196]: 28s
+              - cell "2" [ref=e197]
+              - cell "24,957" [ref=e198]
+              - cell "$0.0000" [ref=e199]
+            - row "03:49 PM 4m 9 5,346 $0.0000" [ref=e200] [cursor=pointer]:
+              - cell "03:49 PM" [ref=e201]:
+                - link "03:49 PM" [ref=e202]:
+                  - /url: /sessions/b13563fd-c84d-461f-b8f3-06c158fd3d1a
+              - cell "4m" [ref=e203]:
+                - generic [ref=e204]: 4m
+              - cell "9" [ref=e205]
+              - cell "5,346" [ref=e206]
+              - cell "$0.0000" [ref=e207]
+            - row "03:30 PM 18m 14 46,937 $0.0000" [ref=e208] [cursor=pointer]:
+              - cell "03:30 PM" [ref=e209]:
+                - link "03:30 PM" [ref=e210]:
+                  - /url: /sessions/d78413c9-ab4e-4fc4-b7f8-03c0ee216070
+              - cell "18m" [ref=e211]:
+                - generic [ref=e212]: 18m
+              - cell "14" [ref=e213]
+              - cell "46,937" [ref=e214]
+              - cell "$0.0000" [ref=e215]
+            - row "03:16 PM 0s 1 12 $0.0000" [ref=e216] [cursor=pointer]:
+              - cell "03:16 PM" [ref=e217]:
+                - link "03:16 PM" [ref=e218]:
+                  - /url: /sessions/a521b505-8e55-477f-aa93-0f03c0c8c21c
+              - cell "0s" [ref=e219]:
+                - generic [ref=e220]: 0s
+              - cell "1" [ref=e221]
+              - cell "12" [ref=e222]
+              - cell "$0.0000" [ref=e223]
+            - row "03:16 PM 0s 1 10,565 $0.0000" [ref=e224] [cursor=pointer]:
+              - cell "03:16 PM" [ref=e225]:
+                - link "03:16 PM" [ref=e226]:
+                  - /url: /sessions/5cd7054e-592c-4f6d-8215-b9a27699946f
+              - cell "0s" [ref=e227]:
+                - generic [ref=e228]: 0s
+              - cell "1" [ref=e229]
+              - cell "10,565" [ref=e230]
+              - cell "$0.0000" [ref=e231]
+            - row "03:08 PM 0s 1 10,565 $0.0000" [ref=e232] [cursor=pointer]:
+              - cell "03:08 PM" [ref=e233]:
+                - link "03:08 PM" [ref=e234]:
+                  - /url: /sessions/11c10116-6f0c-499a-842a-0fcf22972942
+              - cell "0s" [ref=e235]:
+                - generic [ref=e236]: 0s
+              - cell "1" [ref=e237]
+              - cell "10,565" [ref=e238]
+              - cell "$0.0000" [ref=e239]
+            - row "02:17 PM 4s 5 56 $0.0000" [ref=e240] [cursor=pointer]:
+              - cell "02:17 PM" [ref=e241]:
+                - link "02:17 PM" [ref=e242]:
+                  - /url: /sessions/ses_19633b979ffeuFJuGje4Uz3PNX
+              - cell "4s" [ref=e243]:
+                - generic [ref=e244]: 4s
+              - cell "5" [ref=e245]
+              - cell "56" [ref=e246]
+              - cell "$0.0000" [ref=e247]
+            - row "02:07 PM 5s 4 8,092 $0.0000" [ref=e248] [cursor=pointer]:
+              - cell "02:07 PM" [ref=e249]:
+                - link "02:07 PM" [ref=e250]:
+                  - /url: /sessions/ses_1963d300bffe7wroY16E2Mn825
+              - cell "5s" [ref=e251]:
+                - generic [ref=e252]: 5s
+              - cell "4" [ref=e253]
+              - cell "8,092" [ref=e254]
+              - cell "$0.0000" [ref=e255]
+            - row "01:32 PM 4s 4 28 $0.0000" [ref=e256] [cursor=pointer]:
+              - cell "01:32 PM" [ref=e257]:
+                - link "01:32 PM" [ref=e258]:
+                  - /url: /sessions/ses_1965cd4b6ffeMPfx7CRspeOeDP
+              - cell "4s" [ref=e259]:
+                - generic [ref=e260]: 4s
+              - cell "4" [ref=e261]
+              - cell "28" [ref=e262]
+              - cell "$0.0000" [ref=e263]
+            - row "01:06 PM 16m 7 8,147 $0.0000" [ref=e264] [cursor=pointer]:
+              - cell "01:06 PM" [ref=e265]:
+                - link "01:06 PM" [ref=e266]:
+                  - /url: /sessions/ses_196753db3ffel2IH1NRQeAq3Rq
+              - cell "16m" [ref=e267]:
+                - generic [ref=e268]: 16m
+              - cell "7" [ref=e269]
+              - cell "8,147" [ref=e270]
+              - cell "$0.0000" [ref=e271]

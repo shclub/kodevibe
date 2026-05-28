@@ -129,10 +129,10 @@ function SortHeader({ field, sortField, sortDirection, onToggle, children }: {
   const isActive = sortField === field
   return (
     <TableHead
-      className="cursor-pointer hover:bg-muted/50 select-none"
+      className="cursor-pointer hover:bg-muted/50 select-none text-right"
       onClick={() => onToggle(field)}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center justify-end gap-1">
         {children}
         {isActive && (
           <span className="text-xs">{sortDirection === 'asc' ? '↑' : '↓'}</span>
@@ -322,9 +322,9 @@ export default function AnalyticsClient() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Input Tokens</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium truncate pr-2">Input Tokens</CardTitle>
+            <Database className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -337,9 +337,9 @@ export default function AnalyticsClient() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Output Tokens</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium truncate pr-2">Output Tokens</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -352,9 +352,9 @@ export default function AnalyticsClient() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium truncate pr-2">Total Cost</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -367,9 +367,9 @@ export default function AnalyticsClient() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium whitespace-nowrap">Cache Hit Rate</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium truncate pr-2">Cache Hit Rate</CardTitle>
+            <Zap className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${summary ? getCacheRateColor(summary.cacheHitRate) : ''}`}>
