@@ -758,7 +758,14 @@ export default function AnalyticsClient() {
                     <span className="hidden sm:inline">Avg Input/Req</span>
                     <span className="sm:hidden">Avg In</span>
                   </SortHeader>
-                  <SortHeader field="efficiencyScore" sortField={sortField} sortDirection={sortDirection} onToggle={toggleSort}>Score</SortHeader>
+                  <TableHead className="cursor-pointer hover:bg-muted/50 select-none text-center" onClick={() => toggleSort('efficiencyScore')}>
+                    <div className="flex items-center justify-center gap-1">
+                      Score
+                      {sortField === 'efficiencyScore' && (
+                        <span className="text-xs">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                  </TableHead>
                   <TableHead className="text-center hidden lg:table-cell">Score Breakdown</TableHead>
                 </TableRow>
               </TableHeader>
