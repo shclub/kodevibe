@@ -76,7 +76,7 @@ const SOURCE_DOT_COLORS: Record<string, string> = {
 const SOURCE_DOT_COLORS_DEFAULT = 'bg-gray-400'
 
 const SOURCE_LABELS: Record<string, string> = {
-  claude: 'Claude Code',
+  claude: 'Claude',
   codex: 'Codex',
   copilot: 'Copilot',
   opencode: 'OpenCode',
@@ -291,7 +291,7 @@ export default function AnalyticsClient() {
                   : 'hover:bg-muted'
                   } ${i === 0 ? 'rounded-l-lg' : ''} ${i === arr.length - 1 ? 'rounded-r-lg' : ''}`}
               >
-                {s === 'all' ? 'All Sources' : SOURCE_LABELS[s] ?? s}
+                {s === 'all' ? 'All' : SOURCE_LABELS[s] ?? s}
               </button>
             ))}
           </div>
