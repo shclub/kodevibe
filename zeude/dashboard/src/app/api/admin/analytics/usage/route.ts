@@ -474,7 +474,7 @@ export async function GET(req: Request) {
             clickhouse.query({
               query: `
                 SELECT
-                  formatDateTime(date, '%Y-%m-%d') as date,
+                  date,
                   source,
                   sum(invocation_count) as invocation_count
                 FROM tool_invocations_daily
