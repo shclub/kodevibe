@@ -90,7 +90,7 @@ export default function TopDurationSessions() {
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
-            Top 10 Sessions by Duration
+            Top 10 Sessions by Duration ( {from} ~ {to} )
           </CardTitle>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 border rounded-lg px-2 py-1">
