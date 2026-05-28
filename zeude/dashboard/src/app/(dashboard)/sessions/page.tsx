@@ -132,6 +132,7 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
                   <TableHead>User</TableHead>
                   {showSourceColumn && <TableHead>Source</TableHead>}
                   <TableHead>Started</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Events</TableHead>
                   <TableHead>Input Tokens</TableHead>
@@ -162,6 +163,13 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
                         <Link href={href} className="block">
                           {formatTime(session.started_at)}
                         </Link>
+                      </TableCell>
+                      <TableCell>
+                        {session.is_closed ? (
+                          <Badge variant="secondary" className="text-xs">Closed</Badge>
+                        ) : (
+                          <Badge className="text-xs bg-green-500">Running</Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">

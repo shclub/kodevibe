@@ -25,6 +25,7 @@ interface TopSession {
   input_tokens: number
   output_tokens: number
   total_cost: number
+  is_closed: number
 }
 
 function formatDuration(seconds: number): string {
@@ -126,20 +127,19 @@ export default function TopDurationSessions() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12 text-center">#</TableHead>
-                <TableHead>Session</TableHead>
+                <TableHead className="w-10 text-center">#</TableHead>
+                <TableHead className="w-24">Session</TableHead>
                 <TableHead>User</TableHead>
                 <TableHead>Source</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Duration</TableHead>
-                <TableHead className="text-right">Events</TableHead>
-                <TableHead className="text-right">Tokens</TableHead>
-                <TableHead className="text-right">Cost</TableHead>
+                <TableHead className="text-right">Input</TableHead>
+                <TableHead className="text-right">Output</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map((s, i) => {
                 const rank = i + 1
-                const totalTokens = s.input_tokens + s.output_tokens
                 return (
                   <TableRow key={s.session_id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell className={`text-center font-bold ${getRankStyle(rank)}`}>
@@ -147,10 +147,10 @@ export default function TopDurationSessions() {
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       <Link href={`/sessions/${s.session_id}`} className="hover:underline text-blue-600">
-                        {s.session_id.slice(0, 8)}...
+                        {s.session_id.slice(0, 8)}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground truncate max-w-[120px]" title={s.user_email}>
+                    <TableCell className="text-xs text-muted-foreground truncate max-w-[100px]" title={s.user_email}>
                       {s.user_email ? s.user_email.split('@')[0] : '—'}
                     </TableCell>
                     <TableCell>
@@ -159,19 +159,23 @@ export default function TopDurationSessions() {
                       </span>
                     </TableCell>
                     <TableCell>
+                      {s.is_closed ? (
+                        <Badge variant="secondary" className="text-xs">Closed</Badge>
+                      ) : (
+                        <Badge className="text-xs bg-green-500">Running</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <Badge variant="secondary" className="font-mono">
                         <Clock className="h-3 w-3 mr-1" />
                         {formatDuration(s.duration_seconds)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
-                      {Number(s.event_count).toLocaleString()}
+                      {formatNum(s.input_tokens)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
-                      {formatNum(totalTokens)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      ${Number(s.total_cost || 0).toFixed(4)}
+                      {formatNum(s.output_tokens)}
                     </TableCell>
                   </TableRow>
                 )

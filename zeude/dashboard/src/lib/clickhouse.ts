@@ -48,6 +48,7 @@ export interface SessionSummary {
   output_tokens: number
   premium_requests: number
   source: string
+  is_closed: number
 }
 
 export interface DailyStats {
@@ -178,7 +179,8 @@ async function _getSessionsToday(userEmail: string, userId: string = '', source:
           any(ServiceName) ILIKE 'opencode%', 'opencode',
           any(ServiceName) ILIKE 'copilot%', 'copilot',
           'claude'
-        ) as source
+        ) as source,
+        if(countIf(Body IN ('session.shutdown', 'session.end')) > 0, 1, 0) as is_closed
       FROM claude_code_logs
       ${PRICING_JOIN}
       WHERE ${USER_MATCH_CONDITION}
@@ -494,6 +496,7 @@ export interface TopDurationSession {
   input_tokens: number
   output_tokens: number
   total_cost: number
+  is_closed: number
 }
 
 export async function getTopSessionsByDuration(from?: string, to?: string): Promise<TopDurationSession[]> {
@@ -515,7 +518,8 @@ export async function getTopSessionsByDuration(from?: string, to?: string): Prom
         count() as event_count,
         ${INPUT_TOKENS_EXPR} as input_tokens,
         sum(toInt64OrZero(LogAttributes['output_tokens'])) as output_tokens,
-        ${COST_EXPR} as total_cost
+        ${COST_EXPR} as total_cost,
+        if(countIf(Body IN ('session.shutdown', 'session.end')) > 0, 1, 0) as is_closed
       FROM claude_code_logs
       ${PRICING_JOIN}
       WHERE 1=1
