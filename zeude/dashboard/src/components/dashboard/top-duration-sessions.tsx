@@ -173,7 +173,7 @@ export default function TopDurationSessions() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
-                      {formatNum(s.input_tokens + s.output_tokens)}
+                      {formatNum(Number(s.input_tokens) + Number(s.output_tokens))}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
                       {formatNum(s.input_tokens)}
