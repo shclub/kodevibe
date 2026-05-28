@@ -26,13 +26,14 @@ function formatCurrency(num: number): string {
   return `$${num.toFixed(2)}`
 }
 
-// Detect which sources have data
+// Detect which sources have data (tokens or invocations)
 function detectSources(data: UserSourceUsage[]): string[] {
   const sources = new Set<string>()
   for (const u of data) {
     for (const key of Object.keys(u)) {
-      if (key.endsWith('_inputTokens') && (u[key] as number) > 0) {
-        sources.add(key.replace('_inputTokens', ''))
+      if ((key.endsWith('_inputTokens') || key.endsWith('_requestCount')) && (u[key] as number) > 0) {
+        const src = key.endsWith('_requestCount') ? key.replace('_requestCount', '') : key.replace('_inputTokens', '')
+        sources.add(src)
       }
     }
   }
@@ -47,7 +48,7 @@ export const SourceUserComparison = memo(function SourceUserComparison({ data }:
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   function getSourceTotal(u: UserSourceUsage, s: string): number {
-    return ((u[`${s}_inputTokens`] as number) || 0) + ((u[`${s}_outputTokens`] as number) || 0)
+    return ((u[`${s}_inputTokens`] as number) || 0) + ((u[`${s}_outputTokens`] as number) || 0) + ((u[`${s}_requestCount`] as number) || 0)
   }
   function getTotal(u: UserSourceUsage): number {
     return sources.reduce((sum, s) => sum + getSourceTotal(u, s), 0)

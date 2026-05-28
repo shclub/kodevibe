@@ -392,6 +392,7 @@ export async function GET(req: Request) {
         // Build source filter for ClickHouse
         const sourceList = compareSources.map(s => `'${s}'`).join(',')
 
+        // Token-based sources from token_usage_hourly
         const [trendBySourceResult, userBySourceResult] = await Promise.all([
           clickhouse.query({
             query: `
@@ -453,6 +454,7 @@ export async function GET(req: Request) {
               point[`${s}_inputTokens`] = 0
               point[`${s}_outputTokens`] = 0
               point[`${s}_cost`] = 0
+              point[`${s}_requestCount`] = 0
             }
             trendByDateMap.set(row.date, point)
           }
@@ -462,39 +464,159 @@ export async function GET(req: Request) {
           point[`${src}_outputTokens`] = parseInt(row.output_tokens) || 0
           point[`${src}_cost`] = Math.round((parseFloat(row.cost) || 0) * 100) / 100
         }
-        response.trendBySource = Array.from(trendByDateMap.values())
-          .sort((a, b) => a.date.localeCompare(b.date))
 
-        // Pivot user data: dynamic source fields
-        const userBySourceMap = new Map<string, UserSourceUsage>()
-        for (const row of userBySourceData) {
-          const key = row.user_id || row.user_email
-          if (!userBySourceMap.has(key)) {
-            const entry: UserSourceUsage = {
-              userId: row.user_id || row.user_email,
-              userName: getDisplayName(row.user_id, row.user_email),
+        // Also fetch invocation data for copilot/opencode from tool_invocations_daily
+        const invCompareSources = compareSources.filter(s => s === 'copilot' || s === 'opencode')
+        if (invCompareSources.length > 0) {
+          const invSourceList = invCompareSources.map(s => `'${s}'`).join(',')
+
+          const [invTrendResult, invUserResult] = await Promise.all([
+            clickhouse.query({
+              query: `
+                SELECT
+                  formatDateTime(date, '%Y-%m-%d') as date,
+                  source,
+                  sum(invocation_count) as invocation_count
+                FROM tool_invocations_daily
+                WHERE date >= today() - INTERVAL ${days} DAY
+                  AND source IN (${invSourceList})
+                GROUP BY date, source
+                ORDER BY date
+              `,
+              format: 'JSONEachRow',
+            }),
+            clickhouse.query({
+              query: `
+                SELECT
+                  user_id,
+                  any(user_email) as user_email,
+                  source,
+                  sum(invocation_count) as invocation_count
+                FROM tool_invocations_daily
+                WHERE date >= today() - INTERVAL ${days} DAY
+                  AND source IN (${invSourceList})
+                GROUP BY user_id, source
+                ORDER BY invocation_count DESC
+              `,
+              format: 'JSONEachRow',
+            }),
+          ])
+
+          const [invTrendRaw, invUserRaw] = await Promise.all([
+            invTrendResult.json(),
+            invUserResult.json(),
+          ])
+
+          const invTrendData = invTrendRaw as { date: string; source: string; invocation_count: string }[]
+          const invUserData = invUserRaw as { user_id: string; user_email: string; source: string; invocation_count: string }[]
+
+          // Merge invocation trend data into trendByDateMap
+          for (const row of invTrendData) {
+            if (!trendByDateMap.has(row.date)) {
+              const point: SourceTrendPoint = { date: row.date }
+              for (const s of compareSources) {
+                point[`${s}_inputTokens`] = 0
+                point[`${s}_outputTokens`] = 0
+                point[`${s}_cost`] = 0
+                point[`${s}_requestCount`] = 0
+              }
+              trendByDateMap.set(row.date, point)
             }
-            for (const s of compareSources) {
-              entry[`${s}_inputTokens`] = 0
-              entry[`${s}_outputTokens`] = 0
-              entry[`${s}_cost`] = 0
-              entry[`${s}_requestCount`] = 0
-            }
-            userBySourceMap.set(key, entry)
+            const point = trendByDateMap.get(row.date)!
+            const src = row.source
+            point[`${src}_requestCount`] = (point[`${src}_requestCount`] as number || 0) + (parseInt(row.invocation_count) || 0)
           }
-          const entry = userBySourceMap.get(key)!
-          const src = row.source
-          entry[`${src}_inputTokens`] = parseInt(row.input_tokens) || 0
-          entry[`${src}_outputTokens`] = parseInt(row.output_tokens) || 0
-          entry[`${src}_cost`] = Math.round((parseFloat(row.cost) || 0) * 100) / 100
-          entry[`${src}_requestCount`] = parseInt(row.request_count) || 0
+
+          // Merge invocation user data into userBySourceMap
+          const userBySourceMap2 = new Map<string, UserSourceUsage>()
+          // First, populate from token data (will merge below)
+          for (const row of userBySourceData) {
+            const key = row.user_id || row.user_email
+            if (!userBySourceMap2.has(key)) {
+              const entry: UserSourceUsage = {
+                userId: key,
+                userName: getDisplayName(row.user_id, row.user_email),
+              }
+              for (const s of compareSources) {
+                entry[`${s}_inputTokens`] = 0
+                entry[`${s}_outputTokens`] = 0
+                entry[`${s}_cost`] = 0
+                entry[`${s}_requestCount`] = 0
+              }
+              userBySourceMap2.set(key, entry)
+            }
+            const entry = userBySourceMap2.get(key)!
+            const src = row.source
+            entry[`${src}_inputTokens`] = parseInt(row.input_tokens) || 0
+            entry[`${src}_outputTokens`] = parseInt(row.output_tokens) || 0
+            entry[`${src}_cost`] = Math.round((parseFloat(row.cost) || 0) * 100) / 100
+            entry[`${src}_requestCount`] = parseInt(row.request_count) || 0
+          }
+
+          for (const row of invUserData) {
+            const key = row.user_id || row.user_email
+            if (!userBySourceMap2.has(key)) {
+              const entry: UserSourceUsage = {
+                userId: key,
+                userName: getDisplayName(row.user_id, row.user_email),
+              }
+              for (const s of compareSources) {
+                entry[`${s}_inputTokens`] = 0
+                entry[`${s}_outputTokens`] = 0
+                entry[`${s}_cost`] = 0
+                entry[`${s}_requestCount`] = 0
+              }
+              userBySourceMap2.set(key, entry)
+            }
+            const entry = userBySourceMap2.get(key)!
+            const src = row.source
+            entry[`${src}_requestCount`] = (entry[`${src}_requestCount`] as number || 0) + (parseInt(row.invocation_count) || 0)
+          }
+
+          response.trendBySource = Array.from(trendByDateMap.values())
+            .sort((a, b) => a.date.localeCompare(b.date))
+
+          response.byUserBySource = Array.from(userBySourceMap2.values())
+            .sort((a, b) => {
+              const aTotal = compareSources.reduce((sum, s) => sum + ((a[`${s}_inputTokens`] as number) || 0) + ((a[`${s}_requestCount`] as number) || 0), 0)
+              const bTotal = compareSources.reduce((sum, s) => sum + ((b[`${s}_inputTokens`] as number) || 0) + ((b[`${s}_requestCount`] as number) || 0), 0)
+              return bTotal - aTotal
+            })
+        } else {
+          // No invocation-only sources — use token data only
+          response.trendBySource = Array.from(trendByDateMap.values())
+            .sort((a, b) => a.date.localeCompare(b.date))
+
+          const userBySourceMap = new Map<string, UserSourceUsage>()
+          for (const row of userBySourceData) {
+            const key = row.user_id || row.user_email
+            if (!userBySourceMap.has(key)) {
+              const entry: UserSourceUsage = {
+                userId: row.user_id || row.user_email,
+                userName: getDisplayName(row.user_id, row.user_email),
+              }
+              for (const s of compareSources) {
+                entry[`${s}_inputTokens`] = 0
+                entry[`${s}_outputTokens`] = 0
+                entry[`${s}_cost`] = 0
+                entry[`${s}_requestCount`] = 0
+              }
+              userBySourceMap.set(key, entry)
+            }
+            const entry = userBySourceMap.get(key)!
+            const src = row.source
+            entry[`${src}_inputTokens`] = parseInt(row.input_tokens) || 0
+            entry[`${src}_outputTokens`] = parseInt(row.output_tokens) || 0
+            entry[`${src}_cost`] = Math.round((parseFloat(row.cost) || 0) * 100) / 100
+            entry[`${src}_requestCount`] = parseInt(row.request_count) || 0
+          }
+          response.byUserBySource = Array.from(userBySourceMap.values())
+            .sort((a, b) => {
+              const aTotal = compareSources.reduce((sum, s) => sum + ((a[`${s}_inputTokens`] as number) || 0), 0)
+              const bTotal = compareSources.reduce((sum, s) => sum + ((b[`${s}_inputTokens`] as number) || 0), 0)
+              return bTotal - aTotal
+            })
         }
-        response.byUserBySource = Array.from(userBySourceMap.values())
-          .sort((a, b) => {
-            const aTotal = compareSources.reduce((sum, s) => sum + ((a[`${s}_inputTokens`] as number) || 0), 0)
-            const bTotal = compareSources.reduce((sum, s) => sum + ((b[`${s}_inputTokens`] as number) || 0), 0)
-            return bTotal - aTotal
-          })
       }
 
       return Response.json(response)
