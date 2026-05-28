@@ -545,7 +545,7 @@ export default function AnalyticsClient() {
                 <BarChart data={trend.slice(-14).map(t => ({ ...t, date: t.date.slice(5) }))}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatNumber} />
+                  <YAxis width={55} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={formatNumber} />
                   <Tooltip
                     contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
                     formatter={(value, name) => [formatNumber(Number(value)), name === 'inputTokens' ? 'Input' : 'Output']}
