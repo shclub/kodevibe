@@ -729,7 +729,7 @@ export default function AnalyticsClient() {
             Efficiency Comparison
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Click column headers to sort • Compare team efficiency metrics
+            How efficiently each user uses AI — hover column headers for details
           </p>
         </CardHeader>
         <CardContent>
@@ -743,30 +743,78 @@ export default function AnalyticsClient() {
                 <TableRow>
                   <SortHeader field="userName" sortField={sortField} sortDirection={sortDirection} onToggle={toggleSort}>User</SortHeader>
                   <SortHeader field="cacheHitRate" sortField={sortField} sortDirection={sortDirection} onToggle={toggleSort}>
-                    <span className="hidden sm:inline">Cache Hit Rate</span>
-                    <span className="sm:hidden">Cache</span>
+                    <UITooltip>
+                      <TooltipTrigger onClick={e => e.stopPropagation()}>
+                        <span className="hidden sm:inline">Cache Hit Rate</span>
+                        <span className="sm:hidden">Cache</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[200px]">
+                        <p className="text-xs">% of input tokens served from cache. Higher = lower cost per request.</p>
+                      </TooltipContent>
+                    </UITooltip>
                   </SortHeader>
                   <SortHeader field="contextGrowthRate" sortField={sortField} sortDirection={sortDirection} onToggle={toggleSort}>
-                    <span className="hidden sm:inline">Context Growth</span>
-                    <span className="sm:hidden">Growth</span>
+                    <UITooltip>
+                      <TooltipTrigger onClick={e => e.stopPropagation()}>
+                        <span className="hidden sm:inline">Context Growth</span>
+                        <span className="sm:hidden">Growth</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[200px]">
+                        <p className="text-xs">How much context grows per session. Lower = more concise conversations.</p>
+                      </TooltipContent>
+                    </UITooltip>
                   </SortHeader>
                   <SortHeader field="retryDensity" sortField={sortField} sortDirection={sortDirection} onToggle={toggleSort}>
-                    <span className="hidden sm:inline">Retry Density</span>
-                    <span className="sm:hidden">Retry</span>
+                    <UITooltip>
+                      <TooltipTrigger onClick={e => e.stopPropagation()}>
+                        <span className="hidden sm:inline">Retry Density</span>
+                        <span className="sm:hidden">Retry</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[200px]">
+                        <p className="text-xs">% of requests that are retries. Lower = better first-attempt quality.</p>
+                      </TooltipContent>
+                    </UITooltip>
                   </SortHeader>
                   <SortHeader field="avgInputPerRequest" sortField={sortField} sortDirection={sortDirection} onToggle={toggleSort}>
-                    <span className="hidden sm:inline">Avg Input/Req</span>
-                    <span className="sm:hidden">Avg In</span>
+                    <UITooltip>
+                      <TooltipTrigger onClick={e => e.stopPropagation()}>
+                        <span className="hidden sm:inline">Avg Input/Req</span>
+                        <span className="sm:hidden">Avg In</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[200px]">
+                        <p className="text-xs">Average input tokens per request. Lower = more efficient prompts.</p>
+                      </TooltipContent>
+                    </UITooltip>
                   </SortHeader>
                   <TableHead className="cursor-pointer hover:bg-muted/50 select-none text-center" onClick={() => toggleSort('efficiencyScore')}>
-                    <div className="flex items-center justify-center gap-1">
-                      Score
-                      {sortField === 'efficiencyScore' && (
-                        <span className="text-xs">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </div>
+                    <UITooltip>
+                      <TooltipTrigger onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1">
+                          Score
+                          {sortField === 'efficiencyScore' && (
+                            <span className="text-xs">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[200px]">
+                        <p className="text-xs">Composite score (0-100) combining cost efficiency, work quality, and context discipline.</p>
+                      </TooltipContent>
+                    </UITooltip>
                   </TableHead>
-                  <TableHead className="text-center hidden lg:table-cell">Score Breakdown</TableHead>
+                  <TableHead className="text-center hidden lg:table-cell">
+                    <UITooltip>
+                      <TooltipTrigger>
+                        Score Breakdown
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[240px]">
+                        <div className="text-xs space-y-1">
+                          <div>💰 Cost efficiency — output tokens per dollar</div>
+                          <div>✅ Work quality — low retry rate</div>
+                          <div>📦 Context discipline — low context growth</div>
+                        </div>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
