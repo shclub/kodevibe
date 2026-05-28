@@ -1,5 +1,4 @@
 import { createClient, ClickHouseClient } from '@clickhouse/client'
-import { unstable_cache } from 'next/cache'
 import { env } from './env'
 
 // Check if ClickHouse is explicitly configured (not just using defaults)
@@ -195,10 +194,7 @@ async function _getSessionsToday(userEmail: string, userId: string = '', source:
   return result.json()
 }
 
-export function getSessionsToday(userEmail: string, userId: string = '', source: SourceFilter = 'all', from?: string, to?: string): Promise<SessionSummary[]> {
-  const cacheKey = ['sessions-today', userEmail, userId, source, from ?? 'today', to ?? 'today']
-  return unstable_cache(_getSessionsToday, cacheKey, { revalidate: 1 })(userEmail, userId, source, from, to)
-}
+export const getSessionsToday = _getSessionsToday;
 
 async function _getDailyStats(userEmail: string, userId: string = '', days: number = 30, source: SourceFilter = 'all'): Promise<DailyStats[]> {
   const sourceCondition = buildSourceCondition(source)
@@ -225,10 +221,7 @@ async function _getDailyStats(userEmail: string, userId: string = '', days: numb
 }
 
 // 60s cache (daily data changes infrequently)
-export function getDailyStats(userEmail: string, userId: string = '', days: number = 30, source: SourceFilter = 'all'): Promise<DailyStats[]> {
-  const cacheKey = ['daily-stats', userEmail, userId, String(days), source]
-  return unstable_cache(_getDailyStats, cacheKey, { revalidate: 1 })(userEmail, userId, days, source)
-}
+export const getDailyStats = _getDailyStats;
 
 export interface OverviewStats {
   total_sessions: number
@@ -271,10 +264,7 @@ async function _getOverviewStats(userEmail: string, userId: string = '', source:
 }
 
 // 30s cache
-export function getOverviewStats(userEmail: string, userId: string = '', source: SourceFilter = 'all', from?: string, to?: string): Promise<OverviewStats> {
-  const cacheKey = ['overview-stats', userEmail, userId, source, from ?? 'today', to ?? 'today']
-  return unstable_cache(_getOverviewStats, cacheKey, { revalidate: 1 })(userEmail, userId, source, from, to)
-}
+export const getOverviewStats = _getOverviewStats;
 
 // Per-source breakdown of today's stats (used on overview page when source='all').
 export interface SourceStat {
@@ -353,10 +343,7 @@ async function _getTodayStatsBySource(userEmail: string, userId: string = '', fr
   return result.sort((a, b) => a.source.localeCompare(b.source))
 }
 
-export function getTodayStatsBySource(userEmail: string, userId: string = '', from?: string, to?: string): Promise<SourceStat[]> {
-  const cacheKey = ['today-stats-by-source', userEmail, userId, from ?? 'today', to ?? 'today']
-  return unstable_cache(_getTodayStatsBySource, cacheKey, { revalidate: 1 })(userEmail, userId, from, to)
-}
+export const getTodayStatsBySource = _getTodayStatsBySource;
 
 // Today's invocation count from tool_invocations_daily for invocation-only sources.
 // Used by overview page to add copilot+opencode counts when source='all'.
@@ -385,10 +372,7 @@ async function _getTodayInvocationCount(
   return Number(rows[0]?.total ?? 0)
 }
 
-export function getTodayInvocationCount(userEmail: string, userId: string = '', source: SourceFilter = 'all'): Promise<number> {
-  const cacheKey = ['today-invocation-count', userEmail, userId, source]
-  return unstable_cache(_getTodayInvocationCount, cacheKey, { revalidate: 1 })(userEmail, userId, source)
-}
+export const getTodayInvocationCount = _getTodayInvocationCount;
 
 // Returns true for sources that only have invocation data (no tokens).
 // Used to decide whether to also fetch tool_invocations_daily when source='all'.
@@ -440,15 +424,7 @@ async function _getDailyInvocations(
   return result.json()
 }
 
-export function getDailyInvocations(
-  userEmail: string,
-  userId: string = '',
-  days: number = 30,
-  source: SourceFilter = 'all'
-): Promise<DailyInvocation[]> {
-  const cacheKey = ['daily-invocations', userEmail, userId, String(days), source]
-  return unstable_cache(_getDailyInvocations, cacheKey, { revalidate: 1 })(userEmail, userId, days, source)
-}
+export const getDailyInvocations = _getDailyInvocations;
 
 export interface SessionEvent {
   timestamp: string
