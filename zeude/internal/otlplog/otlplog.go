@@ -42,7 +42,7 @@ func SendTokenUsage(p TokenUsageParams) {
 	if p.Endpoint == "" || p.Service == "" {
 		return
 	}
-	if p.InputTokens == 0 && p.OutputTokens == 0 {
+	if p.InputTokens == 0 && p.OutputTokens == 0 && p.PremiumRequests == 0 {
 		return
 	}
 

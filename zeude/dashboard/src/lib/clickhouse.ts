@@ -186,7 +186,7 @@ async function _getSessionsToday(userEmail: string, userId: string = '', source:
 
 export function getSessionsToday(userEmail: string, userId: string = '', source: SourceFilter = 'all', from?: string, to?: string): Promise<SessionSummary[]> {
   const cacheKey = ['sessions-today', userEmail, userId, source, from ?? 'today', to ?? 'today']
-  return unstable_cache(_getSessionsToday, cacheKey, { revalidate: 30 })(userEmail, userId, source, from, to)
+  return unstable_cache(_getSessionsToday, cacheKey, { revalidate: 0 })(userEmail, userId, source, from, to)
 }
 
 async function _getDailyStats(userEmail: string, userId: string = '', days: number = 30, source: SourceFilter = 'all'): Promise<DailyStats[]> {
@@ -216,7 +216,7 @@ async function _getDailyStats(userEmail: string, userId: string = '', days: numb
 // 60s cache (daily data changes infrequently)
 export function getDailyStats(userEmail: string, userId: string = '', days: number = 30, source: SourceFilter = 'all'): Promise<DailyStats[]> {
   const cacheKey = ['daily-stats', userEmail, userId, String(days), source]
-  return unstable_cache(_getDailyStats, cacheKey, { revalidate: 60 })(userEmail, userId, days, source)
+  return unstable_cache(_getDailyStats, cacheKey, { revalidate: 0 })(userEmail, userId, days, source)
 }
 
 export interface OverviewStats {
@@ -264,7 +264,7 @@ async function _getOverviewStats(userEmail: string, userId: string = '', source:
 // 30s cache
 export function getOverviewStats(userEmail: string, userId: string = '', source: SourceFilter = 'all', from?: string, to?: string): Promise<OverviewStats> {
   const cacheKey = ['overview-stats', userEmail, userId, source, from ?? 'today', to ?? 'today']
-  return unstable_cache(_getOverviewStats, cacheKey, { revalidate: 30 })(userEmail, userId, source, from, to)
+  return unstable_cache(_getOverviewStats, cacheKey, { revalidate: 0 })(userEmail, userId, source, from, to)
 }
 
 // Per-source breakdown of today's stats (used on overview page when source='all').
@@ -348,7 +348,7 @@ async function _getTodayStatsBySource(userEmail: string, userId: string = '', fr
 
 export function getTodayStatsBySource(userEmail: string, userId: string = '', from?: string, to?: string): Promise<SourceStat[]> {
   const cacheKey = ['today-stats-by-source', userEmail, userId, from ?? 'today', to ?? 'today']
-  return unstable_cache(_getTodayStatsBySource, cacheKey, { revalidate: 30 })(userEmail, userId, from, to)
+  return unstable_cache(_getTodayStatsBySource, cacheKey, { revalidate: 0 })(userEmail, userId, from, to)
 }
 
 // Today's invocation count from tool_invocations_daily for invocation-only sources.
@@ -380,7 +380,7 @@ async function _getTodayInvocationCount(
 
 export function getTodayInvocationCount(userEmail: string, userId: string = '', source: SourceFilter = 'all'): Promise<number> {
   const cacheKey = ['today-invocation-count', userEmail, userId, source]
-  return unstable_cache(_getTodayInvocationCount, cacheKey, { revalidate: 30 })(userEmail, userId, source)
+  return unstable_cache(_getTodayInvocationCount, cacheKey, { revalidate: 0 })(userEmail, userId, source)
 }
 
 // Returns true for sources that only have invocation data (no tokens).
@@ -440,7 +440,7 @@ export function getDailyInvocations(
   source: SourceFilter = 'all'
 ): Promise<DailyInvocation[]> {
   const cacheKey = ['daily-invocations', userEmail, userId, String(days), source]
-  return unstable_cache(_getDailyInvocations, cacheKey, { revalidate: 60 })(userEmail, userId, days, source)
+  return unstable_cache(_getDailyInvocations, cacheKey, { revalidate: 0 })(userEmail, userId, days, source)
 }
 
 export interface SessionEvent {
