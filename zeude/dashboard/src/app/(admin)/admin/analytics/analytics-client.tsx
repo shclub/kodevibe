@@ -2,6 +2,7 @@
 
 import { useState, useMemo, lazy, Suspense } from 'react'
 import Link from 'next/link'
+import { useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -144,6 +145,7 @@ function SortHeader({ field, sortField, sortDirection, onToggle, children }: {
 const ChartSkeleton = () => <div className="h-[300px] bg-muted animate-pulse rounded-lg" />
 
 export default function AnalyticsClient() {
+  const queryClient = useQueryClient()
   const [period, setPeriod] = useState<Period>('7d')
   const [source, setSource] = useState<SourceFilter>('all')
   const [compareMode, setCompareMode] = useState(false)
@@ -222,8 +224,7 @@ export default function AnalyticsClient() {
   }
 
   const handleRefresh = () => {
-    overviewQuery.refetch()
-    userUsageQuery.refetch()
+    queryClient.invalidateQueries({ queryKey: ['analytics'] })
   }
 
   const handleRegisterCohort = async () => {
