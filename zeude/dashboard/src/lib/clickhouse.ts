@@ -147,8 +147,11 @@ const COST_EXPR = `sum(
   )
 )`
 
-async function _getSessionsToday(userEmail: string, userId: string = '', source: SourceFilter = 'all'): Promise<SessionSummary[]> {
+async function _getSessionsToday(userEmail: string, userId: string = '', source: SourceFilter = 'all', from?: string, to?: string): Promise<SessionSummary[]> {
   const sourceCondition = buildSourceCondition(source)
+  const dateFilter = from && to
+    ? `AND Timestamp >= '${from}' AND Timestamp < '${to}' + INTERVAL 1 DAY`
+    : `AND Timestamp >= today()`
   const result = await clickhouse.query({
     query: `
       SELECT
@@ -169,7 +172,7 @@ async function _getSessionsToday(userEmail: string, userId: string = '', source:
       FROM claude_code_logs
       ${PRICING_JOIN}
       WHERE ${USER_MATCH_CONDITION}
-        AND Timestamp >= today()
+        ${dateFilter}
         ${sourceCondition}
       GROUP BY session_id
       HAVING session_id != '' AND countIf(Body LIKE '%api_request') > 0
@@ -181,11 +184,9 @@ async function _getSessionsToday(userEmail: string, userId: string = '', source:
   return result.json()
 }
 
-// 30s cache to reduce DB load on repeated requests
-// Cache key includes all dynamic params to prevent collisions across different users/sources
-export function getSessionsToday(userEmail: string, userId: string = '', source: SourceFilter = 'all'): Promise<SessionSummary[]> {
-  const cacheKey = ['sessions-today', userEmail, userId, source]
-  return unstable_cache(_getSessionsToday, cacheKey, { revalidate: 30 })(userEmail, userId, source)
+export function getSessionsToday(userEmail: string, userId: string = '', source: SourceFilter = 'all', from?: string, to?: string): Promise<SessionSummary[]> {
+  const cacheKey = ['sessions-today', userEmail, userId, source, from ?? 'today', to ?? 'today']
+  return unstable_cache(_getSessionsToday, cacheKey, { revalidate: 30 })(userEmail, userId, source, from, to)
 }
 
 async function _getDailyStats(userEmail: string, userId: string = '', days: number = 30, source: SourceFilter = 'all'): Promise<DailyStats[]> {

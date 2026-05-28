@@ -1,15 +1,14 @@
 import { getUser } from '@/lib/session'
 import {
   getSessionsToday,
-  getDailyInvocations,
   parseSourceParam,
-  isInvocationOnlySource,
-  type DailyInvocation,
+  type SessionSummary,
 } from '@/lib/clickhouse'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { SourceFilter as SourceFilterComponent } from '@/components/dashboard/source-filter'
+import { DateFilter } from '@/components/dashboard/date-filter'
 import Link from 'next/link'
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -59,16 +58,8 @@ function formatTime(timestamp: string): string {
   })
 }
 
-function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'Asia/Seoul',
-  })
-}
-
 interface SessionsPageProps {
-  searchParams: Promise<{ source?: string }>
+  searchParams: Promise<{ source?: string; from?: string; to?: string }>
 }
 
 export default async function SessionsPage({ searchParams }: SessionsPageProps) {
@@ -76,132 +67,44 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
   const userEmail = user.email ?? ''
   const params = await searchParams
   const source = parseSourceParam(params.source ?? null)
-  const isInvocationOnly = isInvocationOnlySource(source)
+  const from = params.from
+  const to = params.to
 
-  // ── Invocation-only sources (copilot, opencode) ──────────────────────────
-  if (isInvocationOnly) {
-    let invocations: DailyInvocation[] = []
-    try {
-      invocations = await getDailyInvocations(user.email, user.id, 30, source)
-    } catch (error) {
-      console.error('Failed to fetch invocations:', error)
-    }
-
-    const totalInvocations = invocations.reduce((s, r) => s + Number(r.invocation_count), 0)
-    const toolLabel = source === 'copilot' ? 'GitHub Copilot' : 'OpenCode'
-
-    // Group by date + model
-    const grouped = invocations.reduce<Record<string, { models: Set<string>; count: number }>>((acc, r) => {
-      if (!acc[r.date]) acc[r.date] = { models: new Set(), count: 0 }
-      acc[r.date].count += Number(r.invocation_count)
-      if (r.model_id) acc[r.date].models.add(r.model_id)
-      return acc
-    }, {})
-    const rows = Object.entries(grouped).sort(([a], [b]) => b.localeCompare(a))
-
-    return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Sessions</h1>
-            <p className="text-muted-foreground">{toolLabel} — last 30 days</p>
-          </div>
-          <SourceFilterComponent useSearchParams />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Invocations (30d)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalInvocations}</div>
-              <p className="text-xs text-muted-foreground mt-1">Cost &amp; tokens not tracked</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Active Days</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{rows.length}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{toolLabel} Invocations</CardTitle>
-            <CardDescription>Daily breakdown for the last 30 days</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {rows.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No invocations yet. Start using {toolLabel} to see data here.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Invocations</TableHead>
-                    <TableHead>Models</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map(([date, row]) => (
-                    <TableRow key={date}>
-                      <TableCell className="font-medium">{formatDate(date)}</TableCell>
-                      <TableCell>{row.count}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {[...row.models].map(m => (
-                          <Badge key={m} variant="outline" className="mr-1 font-mono text-xs">{m}</Badge>
-                        ))}
-                        {row.models.size === 0 && '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // ── Token-based sources (claude, codex, all) ─────────────────────────────
-  let sessions: Awaited<ReturnType<typeof getSessionsToday>> = []
+  let sessions: SessionSummary[] = []
 
   try {
-    sessions = await getSessionsToday(user.email, user.id, source)
+    sessions = await getSessionsToday(user.email, user.id, source, from, to)
   } catch (error) {
     console.error('Failed to fetch sessions:', error)
   }
 
   const showSourceColumn = source === 'all'
+  const dateLabel = from && to ? `${from} ~ ${to}` : 'today'
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Sessions</h1>
-          <p className="text-muted-foreground">Browse your coding sessions</p>
+          <p className="text-muted-foreground">Browse your coding sessions ({dateLabel})</p>
         </div>
-        <SourceFilterComponent useSearchParams />
+        <div className="flex items-center gap-2">
+          <DateFilter from={from} to={to} />
+          <SourceFilterComponent useSearchParams />
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Today&apos;s Sessions</CardTitle>
+          <CardTitle>Sessions</CardTitle>
           <CardDescription>
-            {sessions.length} session{sessions.length !== 1 ? 's' : ''} recorded today
+            {sessions.length} session{sessions.length !== 1 ? 's' : ''} recorded
           </CardDescription>
         </CardHeader>
         <CardContent>
           {sessions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No sessions recorded today. Start using Claude Code or OpenCode to see your sessions here.
+              No sessions recorded for this period. Start using Claude Code or OpenCode to see your sessions here.
             </div>
           ) : (
             <Table>
