@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Trophy, RefreshCw, Medal, Wand2, RotateCcw } from 'lucide-react'
 import { SourceFilter, type SourceFilterValue } from '@/components/dashboard/source-filter'
 import { useLeaderboard } from '@/hooks/use-leaderboard'
+import Link from 'next/link'
 
 export default function LeaderboardClient({ initialCohort }: { initialCohort: string }) {
   const [source, setSource] = useState<SourceFilterValue>('all')
@@ -118,16 +119,17 @@ export default function LeaderboardClient({ initialCohort }: { initialCohort: st
               ) : data.topTokenUsers.length ? (
                 <div className="space-y-2">
                   {data.topTokenUsers.map((user) => (
-                    <div
+                    <Link
                       key={`${user.userId}-${user.rank}`}
-                      className={`flex items-center justify-between p-3 rounded-lg border ${getRankBg(user.rank)}`}
+                      href={`/sessions?viewUser=${encodeURIComponent(user.userId)}`}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${getRankBg(user.rank)} hover:opacity-80 transition-opacity cursor-pointer block`}
                     >
                       <div className="flex items-center gap-3">
                         {getRankIcon(user.rank)}
                         <span className="font-medium">{user.userName}</span>
                       </div>
                       <span className="font-mono text-sm font-semibold">{user.formattedValue}</span>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : (
@@ -215,9 +217,10 @@ export default function LeaderboardClient({ initialCohort }: { initialCohort: st
                 ) : data?.topTokenUsers.length ? (
                   <div className="space-y-2">
                     {data.topTokenUsers.map((user) => (
-                      <div
+                      <Link
                         key={`${user.userId}-${user.rank}`}
-                        className={`flex items-center justify-between p-3 rounded-lg border ${getRankBg(user.rank)}`}
+                        href={`/sessions?viewUser=${encodeURIComponent(user.userId)}`}
+                        className={`flex items-center justify-between p-3 rounded-lg border ${getRankBg(user.rank)} hover:opacity-80 transition-opacity cursor-pointer block`}
                       >
                         <div className="flex items-center gap-3">
                           {getRankIcon(user.rank)}
@@ -226,7 +229,7 @@ export default function LeaderboardClient({ initialCohort }: { initialCohort: st
                         <span className="font-mono text-sm font-semibold">
                           {user.formattedValue}
                         </span>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 ) : (

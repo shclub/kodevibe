@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { SourceFilter as SourceFilterComponent } from '@/components/dashboard/source-filter'
 import { DateFilter } from '@/components/dashboard/date-filter'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -59,21 +60,25 @@ function formatTime(timestamp: string): string {
 }
 
 interface SessionsPageProps {
-  searchParams: Promise<{ source?: string; from?: string; to?: string }>
+  searchParams: Promise<{ source?: string; from?: string; to?: string; viewUser?: string }>
 }
 
 export default async function SessionsPage({ searchParams }: SessionsPageProps) {
   const user = await getUser()
-  const userEmail = user.email ?? ''
   const params = await searchParams
   const source = parseSourceParam(params.source ?? null)
   const from = params.from
   const to = params.to
+  const viewUser = params.viewUser
+
+  // If viewUser is provided (from leaderboard click), query that user's sessions
+  const queryEmail = viewUser ? '' : (user.email ?? '')
+  const queryUserId = viewUser || user.id
 
   let sessions: SessionSummary[] = []
 
   try {
-    sessions = await getSessionsToday(user.email, user.id, source, from, to)
+    sessions = await getSessionsToday(queryEmail, queryUserId, source, from, to)
   } catch (error) {
     console.error('Failed to fetch sessions:', error)
   }
@@ -81,12 +86,22 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
   const showSourceColumn = source === 'all'
   const dateLabel = from && to ? `${from} ~ ${to}` : 'today'
 
+  const viewUserParam = viewUser ? `&viewUser=${encodeURIComponent(viewUser)}` : ''
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
+          {viewUser && (
+            <Link href="/leaderboard"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors">
+              <ArrowLeft className="h-4 w-4" />Back to Leaderboard
+            </Link>
+          )}
           <h1 className="text-3xl font-bold">Sessions</h1>
-          <p className="text-muted-foreground">Browse your coding sessions ({dateLabel})</p>
+          <p className="text-muted-foreground">
+            {viewUser ? `Sessions for user (${dateLabel})` : `Browse your coding sessions (${dateLabel})`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <DateFilter from={from} to={to} />
@@ -133,7 +148,7 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
                         </Link>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {userEmail}
+                        {viewUser ? viewUser.slice(0, 12) + '…' : (user.email ?? '')}
                       </TableCell>
                       {showSourceColumn && (
                         <TableCell>

@@ -8,7 +8,7 @@ import { notFound } from 'next/navigation'
 
 interface SessionDetailPageProps {
   params: Promise<{ sessionId: string }>
-  searchParams: Promise<{ source?: string }>
+  searchParams: Promise<{ source?: string; viewUser?: string }>
 }
 
 // ── Formatting helpers ──────────────────────────────────────────────────────
@@ -417,11 +417,19 @@ export default async function SessionDetailPage({ params, searchParams }: Sessio
   const user = await getUser()
   const { sessionId } = await params
   const sp = await searchParams
-  const sourceParam = sp.source ? `?source=${sp.source}` : ''
+  const viewUser = sp.viewUser
+
+  const backParams = []
+  if (sp.source) backParams.push(`source=${sp.source}`)
+  if (viewUser) backParams.push(`viewUser=${encodeURIComponent(viewUser)}`)
+  const backQuery = backParams.length ? `?${backParams.join('&')}` : ''
+
+  const queryEmail = viewUser ? '' : (user.email ?? '')
+  const queryUserId = viewUser || user.id
 
   let events: SessionEvent[] = []
   try {
-    events = await getSessionDetails(user.email, user.id, sessionId)
+    events = await getSessionDetails(queryEmail, queryUserId, sessionId)
   } catch (err) {
     console.error('Failed to fetch session details:', err)
   }
@@ -437,7 +445,7 @@ export default async function SessionDetailPage({ params, searchParams }: Sessio
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <Link href={`/sessions${sourceParam}`}
+        <Link href={`/sessions${backQuery}`}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
           <ArrowLeft className="h-4 w-4" />Back to Sessions
         </Link>
