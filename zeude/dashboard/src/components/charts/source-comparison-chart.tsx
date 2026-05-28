@@ -64,11 +64,21 @@ export const SourceComparisonChart = memo(function SourceComparisonChart({ data,
   const allSources = detectSources(data)
   if (allSources.length === 0) return null
 
-  const chartData = data.map(d => ({ ...d, date: d.date.slice(5) }))
-
   // Split sources: token-based vs invocation-only
   const tokenSources = allSources.filter(s => !isInvocationOnly(data, s))
   const invOnlySources = allSources.filter(s => isInvocationOnly(data, s))
+
+  // Pre-compute chart data with bar values
+  const chartData = data.map(d => {
+    const point: Record<string, string | number> = { ...d, date: String(d.date).slice(5) }
+    for (const s of tokenSources) {
+      point[`bar_${s}`] = ((d[`${s}_inputTokens`] as number) || 0) + ((d[`${s}_outputTokens`] as number) || 0)
+    }
+    for (const s of invOnlySources) {
+      point[`bar_${s}`] = (d[`${s}_requestCount`] as number) || 0
+    }
+    return point
+  })
 
   if (metric === 'cost') {
     if (tokenSources.length === 0) return null
@@ -109,7 +119,7 @@ export const SourceComparisonChart = memo(function SourceComparisonChart({ data,
     )
   }
 
-  // Tokens: grouped bar chart per source (only token-based sources)
+  // Tokens: grouped bar chart per source
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -140,15 +150,8 @@ export const SourceComparisonChart = memo(function SourceComparisonChart({ data,
                   return [formatNumber(Number(value)), SOURCE_LABELS[src] ?? src]
                 }}
               />
-              {tokenSources.map(s => (
-                <Bar key={s} dataKey={`bar_${s}`} name={`bar_${s}`} fill={SOURCE_COLORS[s]?.main ?? '#888'} radius={[4, 4, 0, 0]}
-                  data={chartData.map(d => ({ ...d, [`bar_${s}`]: (d[`${s}_inputTokens`] as number || 0) + (d[`${s}_outputTokens`] as number || 0) }))}
-                />
-              ))}
-              {invOnlySources.map(s => (
-                <Bar key={s} dataKey={`bar_${s}`} name={`bar_${s}`} fill={SOURCE_COLORS[s]?.main ?? '#888'} radius={[4, 4, 0, 0]} strokeDasharray="5 5"
-                  data={chartData.map(d => ({ ...d, [`bar_${s}`]: d[`${s}_requestCount`] as number || 0 }))}
-                />
+              {allSources.map(s => (
+                <Bar key={s} dataKey={`bar_${s}`} name={`bar_${s}`} fill={SOURCE_COLORS[s]?.main ?? '#888'} radius={[4, 4, 0, 0]} />
               ))}
             </BarChart>
           </ResponsiveContainer>
