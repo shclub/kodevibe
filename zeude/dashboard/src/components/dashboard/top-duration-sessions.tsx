@@ -133,8 +133,8 @@ export default function TopDurationSessions() {
                 <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Duration</TableHead>
-                <TableHead className="text-right">Input</TableHead>
-                <TableHead className="text-right">Output</TableHead>
+                <TableHead className="text-right">Input Tokens</TableHead>
+                <TableHead className="text-right">Output Tokens</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

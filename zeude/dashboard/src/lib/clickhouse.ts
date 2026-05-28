@@ -180,7 +180,7 @@ async function _getSessionsToday(userEmail: string, userId: string = '', source:
           any(ServiceName) ILIKE 'copilot%', 'copilot',
           'claude'
         ) as source,
-        if(countIf(Body IN ('session.shutdown', 'session.end')) > 0, 1, 0) as is_closed
+        if(countIf(Body IN ('session.shutdown', 'session.end')) > 0 OR dateDiff('minute', max(Timestamp), now()) > 60, 1, 0) as is_closed
       FROM claude_code_logs
       ${PRICING_JOIN}
       WHERE ${USER_MATCH_CONDITION}
@@ -519,7 +519,7 @@ export async function getTopSessionsByDuration(from?: string, to?: string): Prom
         ${INPUT_TOKENS_EXPR} as input_tokens,
         sum(toInt64OrZero(LogAttributes['output_tokens'])) as output_tokens,
         ${COST_EXPR} as total_cost,
-        if(countIf(Body IN ('session.shutdown', 'session.end')) > 0, 1, 0) as is_closed
+        if(countIf(Body IN ('session.shutdown', 'session.end')) > 0 OR dateDiff('minute', max(Timestamp), now()) > 60, 1, 0) as is_closed
       FROM claude_code_logs
       ${PRICING_JOIN}
       WHERE 1=1
