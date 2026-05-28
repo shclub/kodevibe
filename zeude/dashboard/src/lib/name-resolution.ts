@@ -38,11 +38,20 @@ export async function resolveUserNames(
       return { userIdToName, userIdToEmail, getDisplayName: buildGetDisplayName(userIdToName, userIdToEmail) }
     }
 
+    // Filter to valid UUIDs only — Supabase id column is UUID type,
+    // non-UUID values (e.g. SHA hashes from legacy data) cause the entire query to fail.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const validUuids = Array.from(allUserIds).filter(id => UUID_RE.test(id))
+
+    if (validUuids.length === 0) {
+      return { userIdToName, userIdToEmail, getDisplayName: buildGetDisplayName(userIdToName, userIdToEmail) }
+    }
+
     // Direct Supabase lookup — MV user_id is Supabase UUID
     const { data: users } = await supabase
       .from('zeude_users')
       .select('id, name, email')
-      .in('id', Array.from(allUserIds))
+      .in('id', validUuids)
 
     if (users) {
       for (const user of users) {
