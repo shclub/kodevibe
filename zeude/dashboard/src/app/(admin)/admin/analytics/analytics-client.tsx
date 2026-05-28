@@ -323,7 +323,7 @@ export default function AnalyticsClient() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium truncate pr-2">Input Tokens</CardTitle>
+            <CardTitle className="text-sm font-medium pr-2">Input Tokens</CardTitle>
             <Database className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
@@ -338,7 +338,7 @@ export default function AnalyticsClient() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium truncate pr-2">Output Tokens</CardTitle>
+            <CardTitle className="text-sm font-medium pr-2">Output Tokens</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
@@ -353,7 +353,7 @@ export default function AnalyticsClient() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium truncate pr-2">Total Cost</CardTitle>
+            <CardTitle className="text-sm font-medium pr-2">Total Cost</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
@@ -368,7 +368,7 @@ export default function AnalyticsClient() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium truncate pr-2">Cache Hit Rate</CardTitle>
+            <CardTitle className="text-sm font-medium pr-2">Cache Hit Rate</CardTitle>
             <Zap className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
