@@ -107,6 +107,19 @@ export function isInvocationOnlySource(_source: SourceFilter): boolean {
   return false
 }
 
+// All date comparisons use KST (Asia/Seoul) so that "today" matches the user's local day.
+const TZ = 'Asia/Seoul'
+
+// Build date filter SQL for claude_code_logs queries.
+// When from/to are provided, filter by KST date range.
+// When omitted, default to "today" in KST.
+function buildDateFilter(from?: string, to?: string): string {
+  if (from && to) {
+    return `AND toDate(Timestamp, '${TZ}') >= '${from}' AND toDate(Timestamp, '${TZ}') <= '${to}'`
+  }
+  return `AND toDate(Timestamp, '${TZ}') = toDate(now('${TZ}'))`
+}
+
 // Escape a string value for safe interpolation in ClickHouse SQL.
 // Only use for values that cannot be parameterized (e.g., dynamic column names).
 export function escapeClickHouseString(value: string): string {
@@ -149,9 +162,7 @@ const COST_EXPR = `sum(
 
 async function _getSessionsToday(userEmail: string, userId: string = '', source: SourceFilter = 'all', from?: string, to?: string): Promise<SessionSummary[]> {
   const sourceCondition = buildSourceCondition(source)
-  const dateFilter = from && to
-    ? `AND Timestamp >= '${from}' AND Timestamp < '${to}' + INTERVAL 1 DAY`
-    : `AND Timestamp >= today()`
+  const dateFilter = buildDateFilter(from, to)
   const result = await clickhouse.query({
     query: `
       SELECT
@@ -194,7 +205,7 @@ async function _getDailyStats(userEmail: string, userId: string = '', days: numb
   const result = await clickhouse.query({
     query: `
       SELECT
-        toDate(Timestamp) as date,
+        toDate(Timestamp, '${TZ}') as date,
         count(DISTINCT LogAttributes['session.id']) as sessions,
         ${COST_EXPR} as cost,
         ${INPUT_TOKENS_EXPR} as input_tokens,
@@ -202,7 +213,7 @@ async function _getDailyStats(userEmail: string, userId: string = '', days: numb
       FROM claude_code_logs
       ${PRICING_JOIN}
       WHERE ${USER_MATCH_CONDITION}
-        AND Timestamp >= today() - {days:Int32}
+        AND toDate(Timestamp, '${TZ}') >= toDate(now('${TZ}')) - {days:Int32}
         ${sourceCondition}
       GROUP BY date
       ORDER BY date DESC
@@ -235,9 +246,7 @@ const defaultOverviewStats: OverviewStats = {
 
 async function _getOverviewStats(userEmail: string, userId: string = '', source: SourceFilter = 'all', from?: string, to?: string): Promise<OverviewStats> {
   const sourceCondition = buildSourceCondition(source)
-  const dateFilter = from && to
-    ? `AND Timestamp >= '${from}' AND Timestamp < '${to}' + INTERVAL 1 DAY`
-    : `AND Timestamp >= today()`
+  const dateFilter = buildDateFilter(from, to)
   const result = await clickhouse.query({
     query: `
       SELECT
@@ -278,12 +287,10 @@ export interface SourceStat {
 }
 
 async function _getTodayStatsBySource(userEmail: string, userId: string = '', from?: string, to?: string): Promise<SourceStat[]> {
-  const dateFilter = from && to
-    ? `AND Timestamp >= '${from}' AND Timestamp < '${to}' + INTERVAL 1 DAY`
-    : `AND Timestamp >= today()`
+  const dateFilter = buildDateFilter(from, to)
   const invDateFilter = from && to
     ? `AND date >= '${from}' AND date <= '${to}'`
-    : `AND date = today()`
+    : `AND date = toDate(now('${TZ}'))`
   const [tokenResult, invocationResult] = await Promise.all([
     clickhouse.query({
       query: `
@@ -368,7 +375,7 @@ async function _getTodayInvocationCount(
       SELECT sum(invocation_count) as total
       FROM tool_invocations_daily
       WHERE (user_id = {userId:String} OR user_email = {userEmail:String})
-        AND date = today()
+        AND date = toDate(now('${TZ}'))
         ${sourceCondition}
     `,
     query_params: { userEmail, userId },
@@ -422,7 +429,7 @@ async function _getDailyInvocations(
         sum(invocation_count) as invocation_count
       FROM tool_invocations_daily
       WHERE (user_id = {userId:String} OR user_email = {userEmail:String})
-        AND date >= today() - {days:Int32}
+        AND date >= toDate(now('${TZ}')) - {days:Int32}
         ${sourceCondition}
       GROUP BY date, model_id, source
       ORDER BY date DESC, invocation_count DESC
