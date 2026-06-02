@@ -1,6 +1,6 @@
 version: '3.8'
 
-# Zeude - Mac Local Setup
+# KodeVibe - Mac Local Setup
 # Automatically loads credentials from .env in the same directory.
 #
 # Usage:
@@ -9,7 +9,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: zeude-postgres
+    container_name: kodevibe-postgres
     ports:
       - "15432:5432"
     environment:
@@ -18,7 +18,7 @@ services:
       - POSTGRES_DB=zeude
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./zeude/dashboard/postgres/init.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+      - ./kodevibe/dashboard/postgres/init.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U zeude -d zeude"]
       interval: 10s
@@ -28,7 +28,7 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.10
-    container_name: zeude-clickhouse
+    container_name: kodevibe-clickhouse
     ports:
       - "8123:8123"   # HTTP
       - "9000:9000"   # Native
@@ -37,7 +37,7 @@ services:
       - CLICKHOUSE_PASSWORD=dev
     volumes:
       - clickhouse_data:/var/lib/clickhouse
-      - ./zeude/dashboard/clickhouse/init.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+      - ./kodevibe/dashboard/clickhouse/init.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
       interval: 10s
@@ -47,12 +47,12 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.152.1
-    container_name: zeude-otel-collector
+    container_name: kodevibe-otel-collector
     ports:
       - "4317:4317"   # gRPC
       - "4318:4318"   # HTTP
     volumes:
-      - ./zeude/dashboard/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./kodevibe/dashboard/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -61,9 +61,9 @@ services:
 
   dashboard:
     build:
-      context: ./zeude/dashboard
+      context: ./kodevibe/dashboard
       dockerfile: Dockerfile.standalone
-    container_name: zeude-dashboard
+    container_name: kodevibe-dashboard
     ports:
       - "3000:3000"
     environment:
@@ -95,4 +95,8 @@ services:
 
 volumes:
   postgres_data:
+    external: true
+    name: kodevibe_postgres_data
   clickhouse_data:
+    external: true
+    name: kodevibe_clickhouse_data
