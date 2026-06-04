@@ -150,8 +150,8 @@ export async function GET(req: Request) {
         overviewOnly ? null : clickhouse.query({
           query: `
             SELECT
-              user_id,
-              user_email,
+              uid as user_id,
+              ue as user_email,
               input_tokens,
               output_tokens,
               cache_read_tokens,
@@ -159,8 +159,8 @@ export async function GET(req: Request) {
               request_count
             FROM (
               SELECT
-                if(user_id != '', user_id, user_email) as user_id,
-                any(user_email) as user_email,
+                if(user_id != '', user_id, user_email) as uid,
+                any(user_email) as ue,
                 sum(input_tokens) as input_tokens,
                 sum(output_tokens) as output_tokens,
                 sum(cache_read_tokens) as cache_read_tokens,
@@ -170,13 +170,12 @@ export async function GET(req: Request) {
               WHERE hour >= now() - INTERVAL ${days} DAY
                 AND (user_id != '' OR user_email != '')
                 ${sourceFilter}
-              GROUP BY user_id
+              GROUP BY uid
             )
-            ${searchClause}
+            ${searchClause ? searchClause.replace(/user_id/g, 'uid').replace(/user_email/g, 'ue') : ''}
             ORDER BY (input_tokens + output_tokens + cache_read_tokens) DESC
             LIMIT {limit:UInt32}
             OFFSET {offset:UInt32}
-            SETTINGS prefer_column_name_to_alias = 1
           `,
           query_params: userQueryParams,
           format: 'JSONEachRow',
@@ -188,16 +187,15 @@ export async function GET(req: Request) {
             SELECT count() as total_users
             FROM (
               SELECT
-                if(user_id != '', user_id, user_email) as user_id,
-                any(user_email) as user_email
+                if(user_id != '', user_id, user_email) as uid,
+                any(user_email) as ue
               FROM token_usage_hourly
               WHERE hour >= now() - INTERVAL ${days} DAY
                 AND (user_id != '' OR user_email != '')
                 ${sourceFilter}
-              GROUP BY user_id
+              GROUP BY uid
             )
-            ${searchClause}
-            SETTINGS prefer_column_name_to_alias = 1
+            ${searchClause ? searchClause.replace(/user_id/g, 'uid').replace(/user_email/g, 'ue') : ''}
           `,
           query_params: search ? { search } : undefined,
           format: 'JSONEachRow',

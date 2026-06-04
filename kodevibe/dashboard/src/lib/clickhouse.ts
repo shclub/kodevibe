@@ -198,7 +198,10 @@ async function _getSessionsToday(
         ${COST_EXPR} as total_cost,
         ${INPUT_TOKENS_EXPR} as input_tokens,
         sum(toInt64OrZero(LogAttributes['output_tokens'])) as output_tokens,
-        max(toInt64OrZero(LogAttributes['premium_requests'])) as premium_requests,
+        if(any(ServiceName) ILIKE 'copilot%',
+           countIf(Body = 'copilot.chat_request'),
+           max(toInt64OrZero(LogAttributes['premium_requests']))
+        ) as premium_requests,
         multiIf(
           any(ServiceName) ILIKE 'codex%', 'codex',
           any(ServiceName) ILIKE 'opencode%', 'opencode',
