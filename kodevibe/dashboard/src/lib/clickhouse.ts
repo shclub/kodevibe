@@ -199,7 +199,7 @@ async function _getSessionsToday(
         ${INPUT_TOKENS_EXPR} as input_tokens,
         sum(toInt64OrZero(LogAttributes['output_tokens'])) as output_tokens,
         if(any(ServiceName) ILIKE 'copilot%',
-           countIf(Body = 'copilot.chat_request'),
+           toInt64(countIf(Body = 'copilot.chat_request')),
            max(toInt64OrZero(LogAttributes['premium_requests']))
         ) as premium_requests,
         multiIf(
