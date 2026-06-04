@@ -28,7 +28,19 @@ export function SessionAiAnalysis({ sessionId, viewUser }: SessionAiAnalysisProp
         if (def) setSelectedId(def.id)
       })
       .catch(() => {})
-  }, [])
+
+    // Load any previously-saved analysis for this session
+    fetch(`/api/sessions/${sessionId}/analysis`)
+      .then(r => r.ok ? r.json() : null)
+      .then((row: { content?: string } | null) => {
+        if (row?.content) {
+          setText(row.content)
+          setState('done')
+          setCollapsed(false)  // show saved analysis expanded
+        }
+      })
+      .catch(() => {})
+  }, [sessionId])
 
   async function analyze() {
     setState('loading')
@@ -56,10 +68,23 @@ export function SessionAiAnalysis({ sessionId, viewUser }: SessionAiAnalysisProp
       const decoder = new TextDecoder()
       setState('done')
 
+      let full = ''
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        setText(prev => prev + decoder.decode(value, { stream: true }))
+        const chunk = decoder.decode(value, { stream: true })
+        full += chunk
+        setText(prev => prev + chunk)
+      }
+
+      // Persist (overwrite) the completed analysis
+      if (full.trim()) {
+        const model = configs.find(c => c.id === selectedId)?.model
+        fetch(`/api/sessions/${sessionId}/analysis`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: full, model }),
+        }).catch(() => {})
       }
     } catch (err) {
       if ((err as Error).name === 'AbortError') return

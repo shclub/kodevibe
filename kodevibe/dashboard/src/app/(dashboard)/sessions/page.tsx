@@ -182,7 +182,6 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
                   <TableHead>Input Tokens</TableHead>
                   <TableHead>Output Tokens</TableHead>
                   <TableHead>AI Credits</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -227,9 +226,6 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
                       <TableCell>{Number(session.input_tokens).toLocaleString()}</TableCell>
                       <TableCell>{Number(session.output_tokens).toLocaleString()}</TableCell>
                       <TableCell>{Number(session.premium_requests) > 0 ? Number(session.premium_requests) : '—'}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        ${Number(session.total_cost || 0).toFixed(4)}
-                      </TableCell>
                     </TableRow>
                   )
                 })}

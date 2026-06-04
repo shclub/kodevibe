@@ -1,6 +1,6 @@
 import { requireAdmin } from '@/lib/session'
 import { createServerClient } from '@/lib/supabase'
-import { callAiConfig, getProvider, type AiConfiguration } from '@/lib/ai-config'
+import { callAiConfig, getProvider, providerNeedsApiKey, type AiConfiguration } from '@/lib/ai-config'
 
 export async function POST(req: Request) {
   await requireAdmin()
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     apiKey = (data as { api_key: string } | null)?.api_key || ''
   }
 
-  if (!apiKey) {
+  if (!apiKey && providerNeedsApiKey(body.provider)) {
     return Response.json({ error: 'API key is required' }, { status: 400 })
   }
 

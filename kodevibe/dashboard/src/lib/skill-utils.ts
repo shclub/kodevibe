@@ -6,7 +6,6 @@
 // These are internal/testing skills that shouldn't count towards user metrics
 export const EXCLUDED_SKILLS = [
   'rate-limit-options',
-  'kodevibe',
   'Users',
   'users',
 ] as const

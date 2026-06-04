@@ -1,7 +1,7 @@
 import { getSession } from '@/lib/session'
 import { getSessionDetails, type SessionEvent } from '@/lib/clickhouse'
 import { createServerClient } from '@/lib/supabase'
-import { callAiConfig, getProvider, extractStreamText, type AiConfiguration } from '@/lib/ai-config'
+import { callAiConfig, getProvider, providerNeedsApiKey, extractStreamText, type AiConfiguration } from '@/lib/ai-config'
 
 const DEFAULT_SYSTEM_PROMPT = `You are an AI efficiency consultant specializing in token optimization for Claude Code sessions.
 Analyze the session metrics and provide specific, actionable recommendations in Korean.
@@ -203,7 +203,7 @@ export async function POST(
     aiConfig = (Array.isArray(data) && data.length > 0) ? (data[0] as AiConfiguration) : null
   }
 
-  if (!aiConfig || !aiConfig.api_key) {
+  if (!aiConfig || (!aiConfig.api_key && providerNeedsApiKey(aiConfig.provider))) {
     return Response.json(
       { error: 'Admin > Settings에서 AI Configuration을 먼저 설정하세요.' },
       { status: 503 }

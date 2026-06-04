@@ -264,3 +264,13 @@ CREATE TABLE IF NOT EXISTS ai_configurations (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- ============================================================
+-- ai_session_analysis (saved AI token-optimization analyses)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ai_session_analysis (
+  session_id TEXT        PRIMARY KEY,
+  content    TEXT        NOT NULL,
+  model      TEXT        DEFAULT '',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

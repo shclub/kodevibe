@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Save, Plus, Pencil, Trash2, Eye, EyeOff, CheckCircle, XCircle, Star,
 } from 'lucide-react'
-import { PROVIDERS, type AiConfiguration } from '@/lib/ai-config'
+import { PROVIDERS, providerNeedsApiKey, type AiConfiguration } from '@/lib/ai-config'
 
 // ── General settings ─────────────────────────────────────────────────────────
 
@@ -439,7 +439,7 @@ function AiConfigurations() {
                 </select>
               ) : (
                 <Input
-                  placeholder="model-id"
+                  placeholder={selectedProvider?.defaultModel || 'model-id'}
                   value={form.model}
                   onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
                   className="font-mono text-sm"
@@ -461,7 +461,7 @@ function AiConfigurations() {
             {/* Test connection */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handleTest} disabled={testing || !form.api_key || !form.model}>
+                <Button variant="outline" size="sm" onClick={handleTest} disabled={testing || !form.model || (!form.api_key && providerNeedsApiKey(form.provider))}>
                   {testing ? '테스트 중…' : '연결 테스트'}
                 </Button>
                 {testResult?.ok && (

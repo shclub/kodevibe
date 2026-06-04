@@ -39,6 +39,15 @@ export const PROVIDERS: Provider[] = [
     requiresBaseUrl: true,
   },
   {
+    id: 'zhipu',
+    label: 'Zhipu (Z.ai Coding Plan)',
+    baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+    apiFormat: 'openai',
+    defaultModel: 'glm-4.6',
+    models: ['glm-5.1', 'glm-4.7', 'glm-4.6', 'glm-4.5', 'glm-4.5-air'],
+    requiresBaseUrl: false,
+  },
+  {
     id: 'anthropic',
     label: 'Anthropic',
     baseUrl: 'https://api.anthropic.com',
@@ -148,7 +157,8 @@ export const PROVIDERS: Provider[] = [
     baseUrl: 'http://localhost:11434/v1',
     apiFormat: 'openai',
     defaultModel: 'llama3.2',
-    models: ['llama3.2', 'llama3.1', 'mistral', 'codellama', 'qwen2.5'],
+    // Locally-installed models vary per machine → free-form text input
+    models: [],
     requiresBaseUrl: true,
   },
   {
@@ -157,7 +167,8 @@ export const PROVIDERS: Provider[] = [
     baseUrl: 'http://localhost:1234/v1',
     apiFormat: 'openai',
     defaultModel: 'local-model',
-    models: ['local-model'],
+    // Locally-loaded model varies → free-form text input
+    models: [],
     requiresBaseUrl: true,
   },
   {
@@ -173,6 +184,12 @@ export const PROVIDERS: Provider[] = [
 
 export function getProvider(id: string): Provider | undefined {
   return PROVIDERS.find(p => p.id === id)
+}
+
+// Local providers run without authentication.
+const NO_KEY_PROVIDERS = new Set(['ollama', 'lmstudio'])
+export function providerNeedsApiKey(id: string): boolean {
+  return !NO_KEY_PROVIDERS.has(id)
 }
 
 export interface ChatMessage {
@@ -203,8 +220,9 @@ async function callOpenAiCompat(
   return fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${config.api_key}`,
       'Content-Type': 'application/json',
+      // Local providers (ollama/lmstudio) need no auth; omit empty Bearer
+      ...(config.api_key ? { 'Authorization': `Bearer ${config.api_key}` } : {}),
     },
     body: JSON.stringify({
       model: config.model,
