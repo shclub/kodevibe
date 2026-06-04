@@ -2,6 +2,7 @@
 package config
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,6 +18,8 @@ const (
 	DefaultHTTPPort = "4318"
 	// DefaultGRPCPort is the default OTel collector gRPC port.
 	DefaultGRPCPort = "4317"
+	// DefaultReportInterval is the default interval for reporting token usage (seconds).
+	DefaultReportInterval = 5
 )
 
 // GetCollectorEndpoint returns the OTel collector endpoint.
@@ -89,4 +92,36 @@ func GetHTTPEndpoint(grpcEndpoint string) string {
 	}
 
 	return "http://" + host + ":" + port
+}
+
+// GetReportInterval returns the token usage reporting interval in seconds.
+// Reads opencode_report_interval from config file (env > config > defaultValue).
+func GetReportInterval(defaultValue int) int {
+	// Check environment variable first
+	if val := os.Getenv("ZEUDE_REPORT_INTERVAL"); val != "" {
+		var interval int
+		if _, err := fmt.Sscanf(val, "%d", &interval); err == nil && interval > 0 {
+			return interval
+		}
+	}
+
+	// Try to read from config file
+	home, err := os.UserHomeDir()
+	if err == nil {
+		configPath := filepath.Join(home, ".zeude", "config")
+		if data, err := os.ReadFile(configPath); err == nil {
+			lines := strings.Split(string(data), "\n")
+			for _, line := range lines {
+				if strings.HasPrefix(line, "opencode_report_interval=") {
+					value := strings.TrimPrefix(line, "opencode_report_interval=")
+					var interval int
+					if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &interval); err == nil && interval > 0 {
+						return interval
+					}
+				}
+			}
+		}
+	}
+
+	return defaultValue
 }

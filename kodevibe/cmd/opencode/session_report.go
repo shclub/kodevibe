@@ -178,11 +178,14 @@ func reportOpenCodeSessions(syncResult mcpconfig.SyncResult, endpoint string, si
 		return
 	}
 
+	fmt.Fprintf(os.Stderr, "[opencode] reporting %d turns to %s\n", len(turns), endpoint)
+
 	if endpoint == "" {
 		endpoint = config.GetCollectorEndpoint(config.DefaultCollectorEndpoint)
 	}
 
 	for _, turn := range turns {
+		fmt.Fprintf(os.Stderr, "[opencode] sending: session=%s tokens=%d/%d\n", turn.sessionID, turn.inputTokens, turn.outputTokens)
 		otlplog.SendTokenUsage(otlplog.TokenUsageParams{
 			Endpoint:        endpoint,
 			Service:         "opencode",

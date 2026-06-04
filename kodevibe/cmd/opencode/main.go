@@ -119,14 +119,19 @@ func main() {
 	// Record start time for post-session token reporting (5-min buffer before launch)
 	sessionStartMs := time.Now().UnixMilli() - 5*60*1000
 
+	// 8.5 Start background reporter for real-time turn collection
+	reporter := startBackgroundReporter(syncResult, endpoint, sessionStartMs)
+
 	// 9. Run real opencode as a subprocess (not syscall.Exec) so we can post-process.
 	exitCode, err := execBinary(realOpencode, os.Args, os.Environ())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[%s] failed to run opencode: %v\n", prefix, err)
+		reporter.stop()
 		os.Exit(1)
 	}
 
-	// 10. Report token usage from opencode's SQLite DB (fire-and-forget).
+	// 10. Stop background reporter and report any remaining turns
+	reporter.stop()
 	reportOpenCodeSessions(syncResult, endpoint, sessionStartMs)
 
 	os.Exit(exitCode)
