@@ -144,6 +144,7 @@ CREATE TABLE IF NOT EXISTS zeude_hooks (
   script_type    TEXT NOT NULL DEFAULT 'bash',
   is_global      BOOLEAN NOT NULL DEFAULT false,
   teams          TEXT[] DEFAULT '{}',
+  tools          TEXT[] NOT NULL DEFAULT '{claude}',
   env            JSONB DEFAULT '{}',
   status         TEXT NOT NULL DEFAULT 'active',
   created_by     UUID REFERENCES zeude_users(id) ON DELETE SET NULL,

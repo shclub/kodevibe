@@ -59,15 +59,7 @@ func main() {
 		}
 	}
 
-	// 3. Write Copilot hooks
-	if syncResult.Success && len(syncResult.Hooks) > 0 {
-		agentKey := getAgentKey()
-		if agentKey != "" {
-			if err := mcpconfig.SyncCopilotHooks(syncResult.Hooks, agentKey, getDashboardURL()); err != nil {
-				fmt.Fprintf(os.Stderr, "[%s] warning: copilot hooks sync failed: %v\n", prefix, err)
-			}
-		}
-	}
+	// Copilot hooks are installed during background sync (doSync), like Claude/OpenCode.
 
 	// 3. Find real copilot binary
 	realCopilot, err := resolver.FindRealBinaryByName("copilot")

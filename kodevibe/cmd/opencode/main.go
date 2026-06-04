@@ -58,6 +58,7 @@ func main() {
 		}
 	}
 
+
 	// 3. Find real opencode binary
 	realOpencode, err := findRealOpencode()
 	if err != nil {

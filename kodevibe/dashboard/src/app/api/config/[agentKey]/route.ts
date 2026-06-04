@@ -213,6 +213,7 @@ export async function GET(
       script: hook.script_content,
       scriptType: hook.script_type,
       env: hook.env || {},
+      tools: (hook.tools && hook.tools.length > 0) ? hook.tools : ['claude'],
     })) : null
 
     // Agents already filtered at DB level

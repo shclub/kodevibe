@@ -130,6 +130,21 @@ type Hook struct {
 	Script      string            `json:"script"`
 	ScriptType  string            `json:"scriptType"`
 	Env         map[string]string `json:"env,omitempty"`
+	Tools       []string          `json:"tools,omitempty"`
+}
+
+// appliesToTool reports whether this hook targets the given AI tool.
+// Empty Tools defaults to claude-only for backward compatibility.
+func (h Hook) appliesToTool(tool string) bool {
+	if len(h.Tools) == 0 {
+		return tool == "claude"
+	}
+	for _, t := range h.Tools {
+		if t == tool {
+			return true
+		}
+	}
+	return false
 }
 
 // Skill represents a Claude Code slash command skill.
@@ -1168,10 +1183,18 @@ func writeClaudeSettings(settings map[string]interface{}) error {
 // Injects environment variables from user config into hook scripts.
 // Also tracks and removes deleted hooks.
 // Returns list of installed hook IDs for status reporting.
-func installHooks(hooks []Hook, agentKey, dashboardURL, userEmail, team string) ([]string, error) {
+func installHooks(allHooks []Hook, agentKey, dashboardURL, userEmail, team string) ([]string, error) {
 	hooksDir, err := getClaudeHooksDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hooks dir: %w", err)
+	}
+
+	// Only install hooks targeting Claude
+	hooks := make([]Hook, 0, len(allHooks))
+	for _, h := range allHooks {
+		if h.appliesToTool("claude") {
+			hooks = append(hooks, h)
+		}
 	}
 
 	// Load previously managed hooks
@@ -2174,6 +2197,16 @@ func doSync(mode syncMode) SyncResult {
 		if err != nil {
 			logError("hook install failed: %v", err)
 			// Non-fatal: continue with sync
+		}
+
+		// Install OpenCode-targeted hooks as a generated plugin (no-op if none)
+		if err := SyncOpencodeHooks(config.Hooks, dashboardURL, agentKey, config.UserEmail, config.Team); err != nil {
+			logError("opencode hook sync failed: %v", err)
+		}
+
+		// Install Copilot CLI-targeted hooks into ~/.copilot/hooks (no-op if none)
+		if err := SyncCopilotHooks(config.Hooks, dashboardURL, agentKey, config.UserEmail, config.Team); err != nil {
+			logError("copilot hook sync failed: %v", err)
 		}
 	}
 

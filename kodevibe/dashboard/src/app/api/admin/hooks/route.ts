@@ -37,6 +37,9 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const { name, event, description, scriptContent, scriptType = 'bash', env = {}, teams = [], isGlobal = false } = body
+    const rawTools = Array.isArray(body.tools) ? body.tools : ['claude']
+    const tools = rawTools.filter((t: unknown): t is string => ['claude', 'copilot', 'opencode'].includes(t as string))
+    if (tools.length === 0) tools.push('claude')
 
     if (!name || typeof name !== 'string') {
       return Response.json({ error: 'Name is required' }, { status: 400 })
@@ -73,6 +76,7 @@ export async function POST(req: Request) {
         env,
         teams: isGlobal ? [] : teams,
         is_global: isGlobal,
+        tools,
         status: 'active',
         created_by: session.user.id,
       })

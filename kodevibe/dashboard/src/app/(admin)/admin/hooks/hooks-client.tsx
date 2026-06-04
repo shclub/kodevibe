@@ -43,7 +43,11 @@ interface HookFormData {
   env: Record<string, string>
   teams: string[]
   isGlobal: boolean
+  tools: string[]
 }
+
+const AI_TOOLS = ['claude', 'copilot', 'opencode'] as const
+const TOOL_LABELS: Record<string, string> = { claude: 'Claude', copilot: 'Copilot', opencode: 'OpenCode' }
 
 const defaultFormData: HookFormData = {
   name: '',
@@ -54,6 +58,7 @@ const defaultFormData: HookFormData = {
   env: {},
   teams: [],
   isGlobal: false,
+  tools: ['claude'],
 }
 
 export default function HooksClient() {
@@ -100,6 +105,7 @@ export default function HooksClient() {
       env: hook.env || {},
       teams: hook.teams,
       isGlobal: hook.is_global,
+      tools: hook.tools && hook.tools.length > 0 ? hook.tools : ['claude'],
     })
     setError(null)
     setDialogOpen(true)
@@ -113,8 +119,17 @@ export default function HooksClient() {
     }
   }
 
+  function toggleTool(tool: string) {
+    if (formData.tools.includes(tool)) {
+      setFormData({ ...formData, tools: formData.tools.filter(t => t !== tool) })
+    } else {
+      setFormData({ ...formData, tools: [...formData.tools, tool] })
+    }
+  }
+
   async function handleSave() {
     if (!formData.name || !formData.scriptContent) return
+    if (formData.tools.length === 0) { setError('At least one AI tool must be selected'); return }
 
     setError(null)
     try {
@@ -129,6 +144,7 @@ export default function HooksClient() {
           env: formData.env,
           teams: formData.teams,
           isGlobal: formData.isGlobal,
+          tools: formData.tools,
         },
       })
       setDialogOpen(false)
@@ -185,6 +201,7 @@ export default function HooksClient() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Event</TableHead>
+                  <TableHead>AI Tools</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Teams</TableHead>
                   <TableHead>Status</TableHead>
@@ -209,6 +226,22 @@ export default function HooksClient() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{getEventLabel(hook.event)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {AI_TOOLS.map((t) => {
+                            const on = (hook.tools ?? ['claude']).includes(t)
+                            return (
+                              <Badge
+                                key={t}
+                                variant={on ? 'default' : 'outline'}
+                                className={on ? '' : 'opacity-40'}
+                              >
+                                {TOOL_LABELS[t]}
+                              </Badge>
+                            )
+                          })}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">{hook.script_type}</span>
@@ -362,6 +395,23 @@ export default function HooksClient() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">AI Tools (적용 대상)</label>
+              <div className="flex gap-4 mt-1.5">
+                {AI_TOOLS.map((t) => (
+                  <label key={t} className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={formData.tools.includes(t)}
+                      onChange={() => toggleTool(t)}
+                      className="rounded"
+                    />
+                    <span className="text-sm">{TOOL_LABELS[t]}</span>
+                  </label>
+                ))}
               </div>
             </div>
 

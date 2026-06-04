@@ -25,7 +25,7 @@ export async function PATCH(
 
     const { id } = await params
     const body = await req.json()
-    const { name, event, description, scriptContent, scriptType, env, teams, isGlobal, status } = body
+    const { name, event, description, scriptContent, scriptType, env, teams, isGlobal, status, tools } = body
 
     // Validate event if provided
     if (event && !VALID_EVENTS.includes(event)) {
@@ -54,6 +54,10 @@ export async function PATCH(
     }
     if (teams !== undefined && !isGlobal) updateData.teams = teams
     if (status !== undefined) updateData.status = status
+    if (Array.isArray(tools)) {
+      const valid = tools.filter((t: unknown): t is string => ['claude', 'copilot', 'opencode'].includes(t as string))
+      if (valid.length > 0) updateData.tools = valid
+    }
 
     const { data: hook, error } = await supabase
       .from('zeude_hooks')

@@ -204,69 +204,211 @@ func GetOpencodeModel() string {
 	return ""
 }
 
-// SyncCopilotHooks writes Zeude-managed hooks into ~/.copilot/hooks/zeude.json.
-// Copilot hook format: { "version": 1, "hooks": { "eventName": [{"type": "http", "url": "..."}] } }
-func SyncCopilotHooks(hooks []Hook, agentKey, dashboardURL string) error {
+// AgentKey returns the configured agent key (exported wrapper).
+func AgentKey() string { return getAgentKey() }
+
+// DashboardURL returns the configured dashboard URL (exported wrapper).
+func DashboardURL() string { return getDashboardURL() }
+
+// opencodeEventMap maps Claude-style hook events to OpenCode plugin hook names.
+var opencodeEventMap = map[string]string{
+	"UserPromptSubmit": "chat.message",
+	"PreToolUse":       "tool.execute.before",
+	"PostToolUse":      "tool.execute.after",
+}
+
+// SyncOpencodeHooks installs hooks targeting OpenCode as a generated plugin.
+// Hook scripts are written under ~/.config/opencode/kodevibe-hooks/{event}/ and a
+// plugin at ~/.config/opencode/plugin/kodevibe-hooks.js runs them on matching events.
+// Telemetry env (ZEUDE_*) is injected by the plugin at exec time.
+func SyncOpencodeHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
+	ocDir := filepath.Join(home, ".config", "opencode")
+	hooksBase := filepath.Join(ocDir, "kodevibe-hooks")
+	pluginDir := filepath.Join(ocDir, "plugin")
+	pluginPath := filepath.Join(pluginDir, "kodevibe-hooks.js")
 
-	hooksDir := filepath.Join(home, ".copilot", "hooks")
-	if err := os.MkdirAll(hooksDir, 0755); err != nil {
+	// Filter to OpenCode hooks on supported events
+	var hooks []Hook
+	for _, h := range allHooks {
+		if h.appliesToTool("opencode") {
+			if _, ok := opencodeEventMap[h.Event]; ok {
+				hooks = append(hooks, h)
+			}
+		}
+	}
+
+	// Always start clean so deleted hooks are removed
+	_ = os.RemoveAll(hooksBase)
+
+	if len(hooks) == 0 {
+		_ = os.Remove(pluginPath)
+		return nil
+	}
+
+	// Write each hook script
+	for _, h := range hooks {
+		ext := "sh"
+		if h.ScriptType == "python" {
+			ext = "py"
+		} else if h.ScriptType == "node" || h.ScriptType == "javascript" {
+			ext = "js"
+		}
+		evDir := filepath.Join(hooksBase, h.Event)
+		if err := os.MkdirAll(evDir, 0755); err != nil {
+			return err
+		}
+		scriptPath := filepath.Join(evDir, h.ID+"."+ext)
+		if err := os.WriteFile(scriptPath, []byte(h.Script), 0755); err != nil {
+			return err
+		}
+	}
+
+	// Generate plugin JS
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
 		return err
 	}
-
-	// Build hooks config
-	type copilotHook struct {
-		Type       string `json:"type"`
-		URL        string `json:"url,omitempty"`
-		Bash       string `json:"bash,omitempty"`
-		TimeoutSec int    `json:"timeoutSec,omitempty"`
+	plugin := generateOpencodePluginJS(hooksBase, apiURL, agentKey, userEmail, team)
+	if err := writeFileAtomic(pluginPath, []byte(plugin), 0644); err != nil {
+		return err
 	}
+	return nil
+}
 
-	hooksConfig := map[string][]copilotHook{}
+// copilotEventMap maps Claude-style hook events to Copilot CLI hook event names.
+var copilotEventMap = map[string]string{
+	"UserPromptSubmit": "userPromptSubmitted",
+	"PreToolUse":       "preToolUse",
+	"PostToolUse":      "postToolUse",
+	"SessionStart":     "sessionStart",
+	"SessionEnd":       "sessionEnd",
+	"Stop":             "agentStop",
+}
 
-	for _, hook := range hooks {
-		// Convert Zeude hook events to Copilot hook events
-		copilotEvent := ""
-		switch hook.Event {
-		case "UserPromptSubmit":
-			copilotEvent = "userPromptSubmitted"
-		case "PreToolUse":
-			copilotEvent = "preToolUse"
-		case "PostToolUse":
-			copilotEvent = "postToolUse"
-		case "Stop":
-			copilotEvent = "sessionEnd"
-		case "Notification":
-			copilotEvent = "notification"
-		case "SubagentStop":
-			copilotEvent = "subagentStop"
-		default:
-			// Skip unknown events
-			continue
-		}
-
-		// Create HTTP hook that posts to zeude server
-		hooksConfig[copilotEvent] = append(hooksConfig[copilotEvent], copilotHook{
-			Type:       "http",
-			URL:        fmt.Sprintf("%s/api/hook/copilot", dashboardURL),
-			TimeoutSec: 5,
-		})
-	}
-
-	// Build final config
-	config := map[string]interface{}{
-		"version": 1,
-		"hooks":   hooksConfig,
-	}
-
-	data, err := json.MarshalIndent(config, "", "  ")
+// SyncCopilotHooks installs hooks targeting Copilot CLI into ~/.copilot/hooks/kodevibe.json.
+// Each hook's script is written to ~/.copilot/kodevibe-hooks/{event}/ and invoked via a
+// command-type hook entry; ZEUDE_* telemetry env is injected per entry.
+func SyncCopilotHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string) error {
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
+	hooksJSONDir := filepath.Join(home, ".copilot", "hooks")
+	scriptsBase := filepath.Join(home, ".copilot", "kodevibe-hooks")
+	jsonPath := filepath.Join(hooksJSONDir, "kodevibe.json")
 
-	configPath := filepath.Join(hooksDir, "zeude.json")
-	return writeFileAtomic(configPath, data, 0644)
+	var hooks []Hook
+	for _, h := range allHooks {
+		if h.appliesToTool("copilot") {
+			if _, ok := copilotEventMap[h.Event]; ok {
+				hooks = append(hooks, h)
+			}
+		}
+	}
+
+	_ = os.RemoveAll(scriptsBase)
+	if len(hooks) == 0 {
+		_ = os.Remove(jsonPath)
+		return nil
+	}
+
+	baseEnv := map[string]string{
+		"ZEUDE_API_URL":    apiURL,
+		"ZEUDE_AGENT_KEY":  agentKey,
+		"ZEUDE_USER_EMAIL": userEmail,
+		"ZEUDE_TEAM":       team,
+	}
+
+	hooksObj := map[string][]map[string]interface{}{}
+	for _, h := range hooks {
+		ev := copilotEventMap[h.Event]
+		ext, runner := "sh", "bash"
+		if h.ScriptType == "python" {
+			ext, runner = "py", "python3"
+		} else if h.ScriptType == "node" || h.ScriptType == "javascript" {
+			ext, runner = "js", "node"
+		}
+		evDir := filepath.Join(scriptsBase, h.Event)
+		if err := os.MkdirAll(evDir, 0755); err != nil {
+			return err
+		}
+		scriptPath := filepath.Join(evDir, h.ID+"."+ext)
+		if err := os.WriteFile(scriptPath, []byte(h.Script), 0755); err != nil {
+			return err
+		}
+
+		env := map[string]string{}
+		for k, v := range baseEnv {
+			env[k] = v
+		}
+		for k, v := range h.Env {
+			env[k] = v
+		}
+
+		hooksObj[ev] = append(hooksObj[ev], map[string]interface{}{
+			"type":       "command",
+			"bash":       fmt.Sprintf("%s %q", runner, scriptPath),
+			"env":        env,
+			"timeoutSec": 15,
+		})
+	}
+
+	out := map[string]interface{}{"version": 1, "hooks": hooksObj}
+	data, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(hooksJSONDir, 0755); err != nil {
+		return err
+	}
+	return writeFileAtomic(jsonPath, data, 0644)
+}
+
+// generateOpencodePluginJS builds the OpenCode plugin that runs hook scripts.
+func generateOpencodePluginJS(hooksBase, apiURL, agentKey, userEmail, team string) string {
+	env := map[string]string{
+		"ZEUDE_API_URL":    apiURL,
+		"ZEUDE_AGENT_KEY":  agentKey,
+		"ZEUDE_USER_EMAIL": userEmail,
+		"ZEUDE_TEAM":       team,
+	}
+	envJSON, _ := json.Marshal(env)
+	baseJSON, _ := json.Marshal(hooksBase)
+
+	return fmt.Sprintf(`// Auto-generated by KodeVibe. Runs managed hook scripts on OpenCode events.
+import { execFileSync } from "node:child_process"
+import { readdirSync, existsSync } from "node:fs"
+import { join } from "node:path"
+
+const BASE = %s
+const EXTRA_ENV = %s
+
+function runHooks(event, payload) {
+  const dir = join(BASE, event)
+  if (!existsSync(dir)) return
+  let files = []
+  try { files = readdirSync(dir) } catch { return }
+  for (const f of files) {
+    const p = join(dir, f)
+    const cmd = f.endsWith(".py") ? "python3" : f.endsWith(".js") ? "node" : "bash"
+    try {
+      execFileSync(cmd, [p], {
+        input: JSON.stringify(payload || {}),
+        env: { ...process.env, ...EXTRA_ENV },
+        timeout: 15000,
+        stdio: ["pipe", "ignore", "ignore"],
+      })
+    } catch {}
+  }
+}
+
+export default async () => ({
+  "chat.message": async (input) => { runHooks("UserPromptSubmit", input) },
+  "tool.execute.before": async (input) => { runHooks("PreToolUse", input) },
+  "tool.execute.after": async (input) => { runHooks("PostToolUse", input) },
+})
+`, string(baseJSON), string(envJSON))
 }

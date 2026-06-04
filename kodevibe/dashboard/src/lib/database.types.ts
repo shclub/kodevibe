@@ -275,6 +275,7 @@ export interface Hook {
   env: Record<string, string>
   teams: string[]
   is_global: boolean
+  tools: string[]
   status: HookStatus
   created_by: string | null
   created_at: string
