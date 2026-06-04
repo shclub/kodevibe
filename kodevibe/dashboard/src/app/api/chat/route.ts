@@ -2,10 +2,10 @@ import { getSession } from '@/lib/session'
 import { rateLimit } from '@/lib/rate-limit'
 import {
   createChatCompletion,
-  isOpenRouterConfigured,
   PROMPT_ANALYST_SYSTEM_PROMPT,
   type ChatMessage,
 } from '@/lib/openrouter'
+import { getOpenRouterKey, getOpenRouterModel, isAiConfigured } from '@/lib/ai-settings'
 import {
   getUserPrompts,
   getUserPromptStats,
@@ -27,10 +27,10 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // Check if OpenRouter is configured
-    if (!isOpenRouterConfigured()) {
+    // Check if OpenRouter is configured (DB or env)
+    if (!await isAiConfigured()) {
       return Response.json({
-        error: 'AI chatbot is not configured. Please set OPENROUTER_API_KEY.'
+        error: 'AI chatbot is not configured. Please set OpenRouter API Key in Admin > Settings.'
       }, { status: 503 })
     }
 
@@ -138,10 +138,13 @@ ${prompts.slice(0, 5).map((p, i) => `${i + 1}. "${p.prompt_text.substring(0, 150
     // Add current message
     messages.push({ role: 'user', content: body.message })
 
-    // Call OpenRouter
+    // Call OpenRouter (DB key takes precedence over env)
+    const [apiKey, model] = await Promise.all([getOpenRouterKey(), getOpenRouterModel()])
     const completion = await createChatCompletion(messages, {
       temperature: 0.7,
       maxTokens: 1024,
+      apiKey: apiKey ?? undefined,
+      model,
     })
 
     const assistantMessage = completion.choices[0]?.message?.content || 'Unable to generate a response.'

@@ -249,3 +249,18 @@ CREATE TABLE IF NOT EXISTS zeude_settings (
 
 INSERT INTO zeude_settings (key, value) VALUES ('banner', '') ON CONFLICT DO NOTHING;
 INSERT INTO zeude_settings (key, value) VALUES ('prefix', 'zeude') ON CONFLICT DO NOTHING;
+
+-- ============================================================
+-- ai_configurations
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ai_configurations (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT        NOT NULL,
+  provider    TEXT        NOT NULL,
+  base_url    TEXT        NOT NULL,
+  api_key     TEXT        NOT NULL DEFAULT '',
+  model       TEXT        NOT NULL,
+  is_default  BOOLEAN     NOT NULL DEFAULT false,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

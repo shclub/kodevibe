@@ -29,9 +29,10 @@ export async function createChatCompletion(
     model?: string
     temperature?: number
     maxTokens?: number
+    apiKey?: string
   }
 ): Promise<ChatCompletionResponse> {
-  const apiKey = env.OPENROUTER_API_KEY
+  const apiKey = options?.apiKey ?? env.OPENROUTER_API_KEY
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY is not configured')
   }

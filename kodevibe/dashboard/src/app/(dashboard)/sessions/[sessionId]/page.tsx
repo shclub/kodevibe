@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Clock, DollarSign, Hash, Zap, User, Bot, Wrench, Terminal } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { SessionAiAnalysis } from '@/components/session-ai-analysis'
 
 interface SessionDetailPageProps {
   params: Promise<{ sessionId: string }>
@@ -471,6 +472,7 @@ export default async function SessionDetailPage({ params, searchParams }: Sessio
       <SummaryCards events={events} startedAt={startedAt} endedAt={endedAt} />
       <ModelBreakdown events={events} />
       {!hasNoTurns && <CommandSummary turns={turns} />}
+      <SessionAiAnalysis sessionId={sessionId} viewUser={viewUser} />
 
       {compactionCount > 0 && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">

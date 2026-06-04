@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, History, BarChart3, LogOut, Users, Server, Trophy, Zap, Command, Bot, MessageSquare } from 'lucide-react'
+import { LayoutDashboard, History, BarChart3, LogOut, Users, Server, Trophy, Zap, Command, Bot, MessageSquare, Settings } from 'lucide-react'
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
@@ -24,6 +24,7 @@ const workspaceItems = [
 const adminItems = [
   { href: '/admin/team', label: 'Team', icon: Users },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 
 interface DashboardNavProps {
