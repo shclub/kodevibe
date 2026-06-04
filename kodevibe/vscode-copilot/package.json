@@ -1,0 +1,77 @@
+{
+  "name": "kodevibe-copilot",
+  "displayName": "KodeVibe Copilot Tracker",
+  "description": "Tracks GitHub Copilot usage and sends telemetry to KodeVibe dashboard",
+  "version": "0.1.0",
+  "publisher": "kodevibe",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "kodevibe.acceptSuggestion",
+        "title": "KodeVibe: Accept Copilot Suggestion"
+      },
+      {
+        "command": "kodevibe.toggle",
+        "title": "KodeVibe: 추적 On/Off 토글"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "kodevibe.acceptSuggestion",
+        "key": "tab",
+        "when": "inlineSuggestionVisible && editorTextFocus && !editorReadonly && !suggestWidgetVisible"
+      }
+    ],
+    "configuration": {
+      "title": "KodeVibe",
+      "properties": {
+        "kodevibe.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:4318",
+          "description": "KodeVibe OTel Collector URL"
+        },
+        "kodevibe.userEmail": {
+          "type": "string",
+          "default": "",
+          "description": "Your email (auto-detected from git if empty)"
+        },
+        "kodevibe.userId": {
+          "type": "string",
+          "default": "",
+          "description": "Your KodeVibe agent key (sk-or zd_ prefix)"
+        },
+        "kodevibe.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable KodeVibe telemetry"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "bundle": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --platform=node --target=node18 --minify",
+    "watch": "tsc -watch -p ./",
+    "package": "npm run bundle && vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "selfsigned": "^5.5.0"
+  }
+}
