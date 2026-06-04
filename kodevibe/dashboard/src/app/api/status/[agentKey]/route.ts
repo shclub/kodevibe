@@ -13,6 +13,7 @@ interface McpInstallStatusItem {
 interface HookInstallStatusItem {
   hookId: string
   installed: boolean
+  tool?: string
   version?: string
 }
 
@@ -150,6 +151,7 @@ export async function POST(
           hook_id: item.hookId,
           installed: item.installed,
           version: item.version || null,
+          tool: item.tool || 'claude',
           last_checked_at: now,
         })
       }
@@ -158,7 +160,7 @@ export async function POST(
         const { error: upsertError } = await supabase
           .from('zeude_hook_install_status')
           .upsert(hookUpsertData, {
-            onConflict: 'user_id,hook_id',
+            onConflict: 'user_id,hook_id,tool',
           })
 
         if (upsertError) {

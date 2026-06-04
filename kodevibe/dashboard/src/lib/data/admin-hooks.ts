@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session'
 interface InstallStatusSummary {
   installed: number
   total: number
+  byTool: Record<string, { installed: number; total: number }>
   details: Array<{
     userId: string
     userName: string
@@ -37,7 +38,7 @@ export async function fetchHooksData() {
 
   const { data: installStatus } = await supabase
     .from('zeude_hook_install_status')
-    .select('user_id, hook_id, installed, version, last_checked_at')
+    .select('user_id, hook_id, installed, version, tool, last_checked_at')
 
   // Pre-compute maps for O(1) lookups
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,9 +59,20 @@ export async function fetchHooksData() {
       return hook.teams.includes(u.team)
     })
 
+    // Per-tool install counts (tools this hook targets; default claude)
+    const hookTools: string[] = (hook.tools && hook.tools.length > 0) ? hook.tools : ['claude']
+    const byTool: Record<string, { installed: number; total: number }> = {}
+    for (const t of hookTools) {
+      const installedForTool = new Set(
+        hookStatus.filter(s => s.installed && (s.tool || 'claude') === t).map(s => s.user_id)
+      )
+      byTool[t] = { installed: installedForTool.size, total: applicableUsers.length }
+    }
+
     installStatusByHook[hook.id] = {
-      installed: hookStatus.filter(s => s.installed).length,
+      installed: new Set(hookStatus.filter(s => s.installed).map(s => s.user_id)).size,
       total: applicableUsers.length,
+      byTool,
       details: applicableUsers.map(u => {
         const status = hookStatus.find(s => s.user_id === u.id)
         return {

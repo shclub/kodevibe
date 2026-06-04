@@ -2083,6 +2083,22 @@ func SyncSkillsOnly() SyncResult {
 	return doSync(syncSkillsOnly)
 }
 
+// reportToolHookStatus reports install status for a specific AI tool (fire-and-forget).
+func reportToolHookStatus(agentKey, tool string, hookIDs []string) {
+	if len(hookIDs) == 0 {
+		return
+	}
+	go func() {
+		status := make([]HookInstallStatus, 0, len(hookIDs))
+		for _, id := range hookIDs {
+			status = append(status, HookInstallStatus{HookID: id, Installed: true, Tool: tool})
+		}
+		if err := ReportHookInstallStatus(agentKey, status); err != nil {
+			logDebug("failed to report %s hook status: %v", tool, err)
+		}
+	}()
+}
+
 func doSync(mode syncMode) SyncResult {
 	agentKey := getAgentKey()
 	if agentKey == "" {
@@ -2200,14 +2216,20 @@ func doSync(mode syncMode) SyncResult {
 		}
 
 		// Install OpenCode-targeted hooks as a generated plugin (no-op if none)
-		if err := SyncOpencodeHooks(config.Hooks, dashboardURL, agentKey, config.UserEmail, config.Team); err != nil {
-			logError("opencode hook sync failed: %v", err)
+		opencodeHookIDs, ocErr := SyncOpencodeHooks(config.Hooks, dashboardURL, agentKey, config.UserEmail, config.Team)
+		if ocErr != nil {
+			logError("opencode hook sync failed: %v", ocErr)
 		}
 
 		// Install Copilot CLI-targeted hooks into ~/.copilot/hooks (no-op if none)
-		if err := SyncCopilotHooks(config.Hooks, dashboardURL, agentKey, config.UserEmail, config.Team); err != nil {
-			logError("copilot hook sync failed: %v", err)
+		copilotHookIDs, cpErr := SyncCopilotHooks(config.Hooks, dashboardURL, agentKey, config.UserEmail, config.Team)
+		if cpErr != nil {
+			logError("copilot hook sync failed: %v", cpErr)
 		}
+
+		// Report per-tool install status (fire-and-forget)
+		reportToolHookStatus(agentKey, "opencode", opencodeHookIDs)
+		reportToolHookStatus(agentKey, "copilot", copilotHookIDs)
 	}
 
 	// Install skills to ~/.claude/commands/
@@ -2245,6 +2267,7 @@ func doSync(mode syncMode) SyncResult {
 					hookStatus = append(hookStatus, HookInstallStatus{
 						HookID:    hookID,
 						Installed: true,
+						Tool:      "claude",
 					})
 				}
 				if err := ReportHookInstallStatus(agentKey, hookStatus); err != nil {

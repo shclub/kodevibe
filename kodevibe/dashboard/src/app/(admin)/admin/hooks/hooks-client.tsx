@@ -230,12 +230,17 @@ export default function HooksClient() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {AI_TOOLS.map((t) => {
-                            const on = (hook.tools ?? ['claude']).includes(t)
+                            const targeted = (hook.tools ?? ['claude']).includes(t)
+                            if (!targeted) {
+                              return <Badge key={t} variant="outline" className="opacity-30">{TOOL_LABELS[t]}</Badge>
+                            }
+                            const tstat = status?.byTool?.[t]
+                            const installedSome = tstat ? tstat.installed > 0 : false
                             return (
                               <Badge
                                 key={t}
-                                variant={on ? 'default' : 'outline'}
-                                className={on ? '' : 'opacity-40'}
+                                variant={installedSome ? 'default' : 'secondary'}
+                                title={installedSome ? 'installed' : 'targeted, not yet installed'}
                               >
                                 {TOOL_LABELS[t]}
                               </Badge>
@@ -271,9 +276,17 @@ export default function HooksClient() {
                         {status ? (
                           <button
                             onClick={() => { setStatusHook(hook); setStatusDialogOpen(true) }}
-                            className="text-sm hover:underline"
+                            className="text-sm hover:underline space-y-0.5 text-left"
                           >
-                            {status.installed}/{status.total}
+                            {(hook.tools ?? ['claude']).map((t) => {
+                              const tstat = status.byTool?.[t]
+                              return (
+                                <div key={t} className="text-xs">
+                                  <span className="text-muted-foreground">{TOOL_LABELS[t] ?? t}:</span>{' '}
+                                  {tstat ? `${tstat.installed}/${tstat.total}` : `0/${status.total}`}
+                                </div>
+                              )
+                            })}
                           </button>
                         ) : (
                           <span className="text-muted-foreground">-</span>

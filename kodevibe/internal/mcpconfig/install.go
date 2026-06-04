@@ -300,6 +300,7 @@ type HookInstallStatus struct {
 	HookID    string `json:"hookId"`
 	Installed bool   `json:"installed"`
 	Version   string `json:"version,omitempty"`
+	Tool      string `json:"tool,omitempty"` // claude | copilot | opencode (default claude)
 }
 
 // HookInstallStatusReport is the payload sent to the dashboard for hooks.

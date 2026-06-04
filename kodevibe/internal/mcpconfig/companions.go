@@ -221,10 +221,10 @@ var opencodeEventMap = map[string]string{
 // Hook scripts are written under ~/.config/opencode/kodevibe-hooks/{event}/ and a
 // plugin at ~/.config/opencode/plugin/kodevibe-hooks.js runs them on matching events.
 // Telemetry env (ZEUDE_*) is injected by the plugin at exec time.
-func SyncOpencodeHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string) error {
+func SyncOpencodeHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string) ([]string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ocDir := filepath.Join(home, ".config", "opencode")
 	hooksBase := filepath.Join(ocDir, "kodevibe-hooks")
@@ -246,10 +246,11 @@ func SyncOpencodeHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string
 
 	if len(hooks) == 0 {
 		_ = os.Remove(pluginPath)
-		return nil
+		return nil, nil
 	}
 
 	// Write each hook script
+	installed := make([]string, 0, len(hooks))
 	for _, h := range hooks {
 		ext := "sh"
 		if h.ScriptType == "python" {
@@ -259,23 +260,24 @@ func SyncOpencodeHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string
 		}
 		evDir := filepath.Join(hooksBase, h.Event)
 		if err := os.MkdirAll(evDir, 0755); err != nil {
-			return err
+			return nil, err
 		}
 		scriptPath := filepath.Join(evDir, h.ID+"."+ext)
 		if err := os.WriteFile(scriptPath, []byte(h.Script), 0755); err != nil {
-			return err
+			return nil, err
 		}
+		installed = append(installed, h.ID)
 	}
 
 	// Generate plugin JS
 	if err := os.MkdirAll(pluginDir, 0755); err != nil {
-		return err
+		return nil, err
 	}
 	plugin := generateOpencodePluginJS(hooksBase, apiURL, agentKey, userEmail, team)
 	if err := writeFileAtomic(pluginPath, []byte(plugin), 0644); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return installed, nil
 }
 
 // copilotEventMap maps Claude-style hook events to Copilot CLI hook event names.
@@ -291,10 +293,10 @@ var copilotEventMap = map[string]string{
 // SyncCopilotHooks installs hooks targeting Copilot CLI into ~/.copilot/hooks/kodevibe.json.
 // Each hook's script is written to ~/.copilot/kodevibe-hooks/{event}/ and invoked via a
 // command-type hook entry; ZEUDE_* telemetry env is injected per entry.
-func SyncCopilotHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string) error {
+func SyncCopilotHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string) ([]string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	hooksJSONDir := filepath.Join(home, ".copilot", "hooks")
 	scriptsBase := filepath.Join(home, ".copilot", "kodevibe-hooks")
@@ -312,7 +314,7 @@ func SyncCopilotHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string)
 	_ = os.RemoveAll(scriptsBase)
 	if len(hooks) == 0 {
 		_ = os.Remove(jsonPath)
-		return nil
+		return nil, nil
 	}
 
 	baseEnv := map[string]string{
@@ -322,6 +324,7 @@ func SyncCopilotHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string)
 		"ZEUDE_TEAM":       team,
 	}
 
+	installed := make([]string, 0, len(hooks))
 	hooksObj := map[string][]map[string]interface{}{}
 	for _, h := range hooks {
 		ev := copilotEventMap[h.Event]
@@ -333,11 +336,11 @@ func SyncCopilotHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string)
 		}
 		evDir := filepath.Join(scriptsBase, h.Event)
 		if err := os.MkdirAll(evDir, 0755); err != nil {
-			return err
+			return nil, err
 		}
 		scriptPath := filepath.Join(evDir, h.ID+"."+ext)
 		if err := os.WriteFile(scriptPath, []byte(h.Script), 0755); err != nil {
-			return err
+			return nil, err
 		}
 
 		env := map[string]string{}
@@ -354,17 +357,21 @@ func SyncCopilotHooks(allHooks []Hook, apiURL, agentKey, userEmail, team string)
 			"env":        env,
 			"timeoutSec": 15,
 		})
+		installed = append(installed, h.ID)
 	}
 
 	out := map[string]interface{}{"version": 1, "hooks": hooksObj}
 	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := os.MkdirAll(hooksJSONDir, 0755); err != nil {
-		return err
+		return nil, err
 	}
-	return writeFileAtomic(jsonPath, data, 0644)
+	if err := writeFileAtomic(jsonPath, data, 0644); err != nil {
+		return nil, err
+	}
+	return installed, nil
 }
 
 // generateOpencodePluginJS builds the OpenCode plugin that runs hook scripts.

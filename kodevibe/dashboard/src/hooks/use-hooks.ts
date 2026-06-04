@@ -5,6 +5,7 @@ import type { Hook } from '@/lib/database.types'
 interface InstallStatusSummary {
   installed: number
   total: number
+  byTool?: Record<string, { installed: number; total: number }>
   details: Array<{
     userId: string
     userName: string

@@ -161,11 +161,12 @@ CREATE TABLE IF NOT EXISTS zeude_hook_install_status (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID NOT NULL REFERENCES zeude_users(id) ON DELETE CASCADE,
   hook_id         UUID NOT NULL REFERENCES zeude_hooks(id) ON DELETE CASCADE,
+  tool            TEXT NOT NULL DEFAULT 'claude',
   installed       BOOLEAN NOT NULL DEFAULT false,
   version         TEXT,
   last_checked_at TIMESTAMPTZ,
   updated_at      TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, hook_id)
+  UNIQUE(user_id, hook_id, tool)
 );
 
 -- ============================================================
