@@ -101,7 +101,7 @@ export async function GET(
         .or(`is_global.eq.true,teams.cs.{"${user.team}"}`),
       supabase
         .from('zeude_hooks')
-        .select('id, name, event, description, script_content, script_type, env, is_global, teams')
+        .select('id, name, event, description, script_content, script_type, env, is_global, teams, tools')
         .eq('status', 'active')
         .or(`is_global.eq.true,teams.cs.{"${user.team}"}`),
       supabase
