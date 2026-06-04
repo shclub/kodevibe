@@ -1,15 +1,15 @@
 import * as vscode from 'vscode'
-import * as http from 'http'
+import * as path from 'path'
 import { sendLogs, type LogEvent } from './telemetry'
-import { getConfig, resolveEmail, estimateTokens, extractInserted, type SessionInfo } from './session'
-import { startProxy, initCA, PROXY_PORT, setDebugLog, type ChatEvent } from './proxy'
+import { getConfig, resolveEmail, resolveUserId, notifyEmailConfig, estimateTokens, extractInserted, type SessionInfo } from './session'
+import { getWorkspaceStorageRoot, scanNewTurns, loadSeen, saveSeen, type ChatTurn } from './watcher'
+import { installQuotaCapture, type QuotaInfo } from './quota'
 import { randomUUID } from 'crypto'
 
 let info: SessionInfo
 let userEmail = 'unknown'
 let pendingLogs: LogEvent[] = []
 let flushTimer: NodeJS.Timeout | undefined
-let proxyServer: http.Server | undefined
 
 // ── Flush ─────────────────────────────────────────────────────────────────
 
@@ -35,6 +35,7 @@ function resourceAttrs(): Record<string, string> {
     'service.version': '0.1.0',
     'zeude.user.email': userEmail,
     'zeude.user.id': info.userId || '',
+    'tool': 'vscode',
   }
 }
 
@@ -54,27 +55,95 @@ function sendSessionStart() {
   })
 }
 
-// ── Proxy chat event → OTel ───────────────────────────────────────────────
+// ── Chat turn (from local session JSON) → OTel ────────────────────────────
 
-function onChatEvent(ev: ChatEvent) {
+function onChatTurn(turn: ChatTurn) {
+  const promptText = turn.prompt.slice(0, 8000)
+  const responseText = turn.response.slice(0, 8000)
+
+  // chat_request: token/model/billing metrics. session.id = VS Code chat session.
   enqueue({
-    timestamp: new Date().toISOString(),
+    timestamp: turn.timestamp,
     body: 'copilot.chat_request',
     attributes: {
-      'session.id': info.sessionId,
-      'prompt.id': randomUUID(),
+      'session.id': turn.sessionId,
+      'prompt.id': turn.requestId,
       'user.email': userEmail,
       'user.id': info.userId || '',
-      'input_tokens': String(ev.inputTokens),
-      'output_tokens': String(ev.outputTokens),
+      'input_tokens': String(turn.inputTokens),
+      'output_tokens': String(turn.outputTokens),
       'cache_read_tokens': '0',
       'cache_creation_tokens': '0',
       'cost_usd': '0',
-      'duration_ms': String(ev.durationMs),
-      'model': ev.model,
-      'prompt_length': String(ev.promptLength),
+      'duration_ms': '0',
+      'model': turn.model,
+      'prompt_length': String(promptText.length),
       'query_source': 'copilot_chat',
       'billing_type': 'ai_credits',
+      'prompt': promptText,
+      ...(responseText ? { 'response': responseText } : {}),
+      ...(turn.projectPath ? { 'project_path': turn.projectPath, 'working_directory': turn.projectPath } : {}),
+      ...(turn.projectName ? { 'project_name': turn.projectName } : {}),
+    },
+    resourceAttributes: turnResourceAttrs(turn),
+  })
+
+  // user_prompt: so prompt-text dashboards pick it up
+  enqueue({
+    timestamp: turn.timestamp,
+    body: 'copilot.user_prompt',
+    attributes: {
+      'session.id': turn.sessionId,
+      'prompt.id': turn.requestId,
+      'user.email': userEmail,
+      'user.id': info.userId || '',
+      'prompt': promptText,
+      'prompt_length': String(promptText.length),
+      'query_source': 'copilot_chat',
+      ...(turn.projectPath ? { 'project_path': turn.projectPath, 'working_directory': turn.projectPath } : {}),
+      ...(turn.projectName ? { 'project_name': turn.projectName } : {}),
+    },
+    resourceAttributes: turnResourceAttrs(turn),
+  })
+}
+
+// Resource attrs for a turn — include project so dashboards group by real folder name
+function turnResourceAttrs(turn: ChatTurn): Record<string, string> {
+  const attrs = resourceAttrs()
+  if (turn.projectPath) {
+    attrs['zeude.project_path'] = turn.projectPath
+    attrs['zeude.working_directory'] = turn.projectPath
+  }
+  return attrs
+}
+
+// ── Quota / AI credits → OTel ─────────────────────────────────────────────
+
+let lastQuotaSig = ''
+
+function onQuota(q: QuotaInfo) {
+  // De-dupe: only emit when the snapshot actually changes
+  const sig = `${q.plan}|${q.premiumRemaining}|${q.premiumEntitlement}`
+  if (sig === lastQuotaSig) return
+  lastQuotaSig = sig
+
+  const used = (q.premiumEntitlement != null && q.premiumRemaining != null)
+    ? Math.max(0, q.premiumEntitlement - q.premiumRemaining)
+    : undefined
+
+  enqueue({
+    timestamp: new Date().toISOString(),
+    body: 'copilot.quota',
+    attributes: {
+      'session.id': info.sessionId,
+      'user.email': userEmail,
+      'user.id': info.userId || '',
+      'copilot_plan': q.plan,
+      'billing_type': 'ai_credits',
+      ...(q.premiumEntitlement != null ? { 'ai_credits_entitlement': String(q.premiumEntitlement) } : {}),
+      ...(q.premiumRemaining != null ? { 'ai_credits_remaining': String(q.premiumRemaining) } : {}),
+      ...(used != null ? { 'ai_credits_used': String(used), 'premium_requests': String(used) } : {}),
+      ...(q.premiumPercentRemaining != null ? { 'ai_credits_percent_remaining': String(q.premiumPercentRemaining) } : {}),
     },
     resourceAttributes: resourceAttrs(),
   })
@@ -125,85 +194,6 @@ async function acceptAndTrack() {
 
 // ── Chat → Apply in editor detection ─────────────────────────────────────
 
-let lastTypingTime = 0
-
-function trackDocumentChanges(ctx: vscode.ExtensionContext) {
-  ctx.subscriptions.push(
-    vscode.workspace.onDidChangeTextDocument(event => {
-      for (const change of event.contentChanges) {
-        const lines = (change.text.match(/\n/g) || []).length + 1
-        const timeSinceTyping = Date.now() - lastTypingTime
-
-        if (lines >= 3 && timeSinceTyping > 500 && change.text.trim().length > 0) {
-          const outputTokens = estimateTokens(change.text)
-          enqueue({
-            timestamp: new Date().toISOString(),
-            body: 'copilot.chat_applied',
-            attributes: {
-              'session.id': info.sessionId,
-              'prompt.id': randomUUID(),
-              'user.email': userEmail,
-              'user.id': info.userId || '',
-              'input_tokens': '0',
-              'output_tokens': String(outputTokens),
-              'cache_read_tokens': '0',
-              'cache_creation_tokens': '0',
-              'cost_usd': '0',
-              'duration_ms': '0',
-              'model': 'copilot-chat',
-              'language': event.document.languageId,
-              'file_path': vscode.workspace.asRelativePath(event.document.uri),
-              'suggestion_chars': String(change.text.length),
-              'suggestion_lines': String(lines),
-            },
-            resourceAttributes: resourceAttrs(),
-          })
-        } else if (change.text.length <= 10) {
-          lastTypingTime = Date.now()
-        }
-      }
-    })
-  )
-}
-
-// ── Proxy setup & notification ────────────────────────────────────────────
-
-function startProxyServer(storagePath: string) {
-  try {
-    initCA(storagePath)
-    proxyServer = startProxy(storagePath, onChatEvent)
-    proxyServer.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE') {
-        vscode.window.showWarningMessage(`KodeVibe: 포트 ${PROXY_PORT}이 이미 사용 중입니다.`)
-      }
-    })
-  } catch (err) {
-    vscode.window.showErrorMessage(`KodeVibe: 프록시 시작 실패 — ${err}`)
-  }
-}
-
-function checkProxyConfig() {
-  const cfg = vscode.workspace.getConfiguration()
-  const proxy = cfg.get<string>('http.proxy', '')
-  const strictSSL = cfg.get<boolean>('http.proxyStrictSSL', true)
-
-  const needsProxy = !proxy.includes(String(PROXY_PORT))
-  const needsSSL = strictSSL !== false
-
-  if (needsProxy || needsSSL) {
-    vscode.window.showInformationMessage(
-      `KodeVibe: Copilot Chat 완전 추적을 위해 VS Code settings.json에 다음을 추가하세요:`,
-      '자동 설정',
-      '나중에'
-    ).then(choice => {
-      if (choice === '자동 설정') {
-        cfg.update('http.proxy', `http://localhost:${PROXY_PORT}`, vscode.ConfigurationTarget.Global)
-        cfg.update('http.proxyStrictSSL', false, vscode.ConfigurationTarget.Global)
-        vscode.window.showInformationMessage('KodeVibe: 프록시 설정 완료! VS Code를 재시작하세요.')
-      }
-    })
-  }
-}
 
 // ── @kodevibe chat participant (optional) ─────────────────────────────────
 
@@ -252,6 +242,44 @@ function registerChatParticipant(ctx: vscode.ExtensionContext) {
   } catch { /* VS Code 버전 미지원 */ }
 }
 
+// ── Chat session watcher ──────────────────────────────────────────────────
+
+function startChatSessionWatcher(ctx: vscode.ExtensionContext, debugLog: (m: string) => void) {
+  const wsRoot = getWorkspaceStorageRoot(ctx.globalStorageUri.fsPath)
+  const stateFile = path.join(ctx.globalStorageUri.fsPath, 'seen-requests.json')
+  const seen = loadSeen(stateFile)
+  let firstScan = true
+
+  debugLog(`[watcher] chat session root: ${wsRoot}`)
+
+  const scan = () => {
+    if (!info.enabled) return
+    try {
+      const turns = scanNewTurns(wsRoot, seen)
+      if (firstScan) {
+        // On first run, mark existing turns as seen WITHOUT sending (avoid backfilling history)
+        firstScan = false
+        saveSeen(stateFile, seen)
+        debugLog(`[watcher] baseline: ${seen.size} existing turns marked seen`)
+        return
+      }
+      if (turns.length) {
+        for (const t of turns) {
+          onChatTurn(t)
+          debugLog(`[watcher] turn session=${t.sessionId.slice(0, 8)} model=${t.model} promptLen=${t.prompt.length} respLen=${t.response.length}`)
+        }
+        saveSeen(stateFile, seen)
+      }
+    } catch (e) {
+      debugLog(`[watcher] scan error: ${e}`)
+    }
+  }
+
+  scan() // baseline immediately
+  const timer = setInterval(scan, 5000)
+  ctx.subscriptions.push({ dispose: () => clearInterval(timer) })
+}
+
 // ── Activation ────────────────────────────────────────────────────────────
 
 export async function activate(ctx: vscode.ExtensionContext) {
@@ -260,22 +288,36 @@ export async function activate(ctx: vscode.ExtensionContext) {
 
   const outputChannel = vscode.window.createOutputChannel('KodeVibe')
   ctx.subscriptions.push(outputChannel)
-  setDebugLog((msg: string) => outputChannel.appendLine(msg))
+  const debugLogPath = require('path').join(ctx.globalStorageUri.fsPath, 'debug.log')
+  try { require('fs').mkdirSync(ctx.globalStorageUri.fsPath, { recursive: true }) } catch {}
+  const debugLog = (msg: string) => {
+    outputChannel.appendLine(msg)
+    try { require('fs').appendFileSync(debugLogPath, `${new Date().toISOString()} ${msg}\n`) } catch {}
+  }
 
   userEmail = await resolveEmail(info)
-  outputChannel.appendLine(`KodeVibe activated. user=${userEmail}`)
+  // Resolve KodeVibe UUID so telemetry unifies identity across all sources;
+  // if no UUID is found, fall back to the email's local part (before @).
+  const resolvedId = await resolveUserId(info, userEmail)
+  if (resolvedId) {
+    info.userId = resolvedId
+  } else if (!info.userId && userEmail && userEmail !== 'unknown') {
+    info.userId = userEmail.split('@')[0]
+  }
+  debugLog(`KodeVibe activated. user=${userEmail} userId=${info.userId || '(none)'}`)
+  notifyEmailConfig(userEmail)
 
-  // Start MITM proxy for mandatory chat tracking
-  startProxyServer(ctx.globalStorageUri.fsPath)
-  checkProxyConfig()
+  // Watch VS Code's local chat session store for Copilot chat prompts/responses.
+  // (Network interception is impossible: chat runs in VS Code core + TLS pinning.)
+  startChatSessionWatcher(ctx, debugLog)
+
+  // Capture Copilot quota / AI credits from copilot_internal/user responses
+  installQuotaCapture(onQuota, debugLog)
 
   // Tab intercept
   ctx.subscriptions.push(
     vscode.commands.registerCommand('kodevibe.acceptSuggestion', acceptAndTrack)
   )
-
-  // Chat → Apply detection
-  trackDocumentChanges(ctx)
 
   // Optional @kodevibe participant
   registerChatParticipant(ctx)
@@ -286,7 +328,7 @@ export async function activate(ctx: vscode.ExtensionContext) {
   ctx.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(e => {
       if (e.affectsConfiguration('kodevibe')) {
-        info = { ...getConfig(), sessionId: info.sessionId }
+        info = getConfig()
       }
     })
   )
@@ -296,7 +338,7 @@ export async function activate(ctx: vscode.ExtensionContext) {
     vscode.commands.registerCommand('kodevibe.toggle', async () => {
       const current = vscode.workspace.getConfiguration('kodevibe').get<boolean>('enabled', true)
       await vscode.workspace.getConfiguration('kodevibe').update('enabled', !current, vscode.ConfigurationTarget.Global)
-      info = { ...getConfig(), sessionId: info.sessionId }
+      info = getConfig()
       updateBar()
       vscode.window.showInformationMessage(`KodeVibe 추적 ${!current ? '활성화' : '비활성화'} 됨`)
     })
@@ -311,7 +353,7 @@ export async function activate(ctx: vscode.ExtensionContext) {
     bar.tooltip = [
       `KodeVibe ${on ? '추적 중 (클릭하여 끄기)' : '꺼짐 (클릭하여 켜기)'}`,
       `유저: ${userEmail}`,
-      `프록시: localhost:${PROXY_PORT}`,
+      '방식: in-process hook',
     ].join('\n')
     bar.color = on ? undefined : new vscode.ThemeColor('statusBarItem.warningForeground')
   }
@@ -328,6 +370,5 @@ export async function activate(ctx: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  proxyServer?.close()
   flush()
 }

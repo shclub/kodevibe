@@ -25,7 +25,7 @@ const PROMPT_TYPE_COLORS: Record<string, string> = {
 }
 
 const PROMPT_TYPE_LABELS: Record<string, string> = {
-  natural:  'Natural',
+  natural:  '자연어',
   skill:    'Skill',
   command:  'Command',
   agent:    'Agent',
@@ -59,7 +59,9 @@ export default async function PromptsPage({ searchParams }: PromptsPageProps) {
   const params = await searchParams
   const keyword = (params.q ?? '').trim()
 
-  const identifier = { userId: user.id, userEmail: user.email }
+  // Admin sees all users' prompts (incl. Copilot under other emails); others see only their own.
+  const isAdmin = user.role === 'admin'
+  const identifier = isAdmin ? {} : { userId: user.id, userEmail: user.email }
 
   let prompts: PromptRecord[] = []
   let stats = { total_prompts: 0, avg_length: 0, unique_sessions: 0, top_projects: [] as { project: string; count: number }[] }
@@ -170,7 +172,7 @@ export default async function PromptsPage({ searchParams }: PromptsPageProps) {
                 <TableRow>
                   <TableHead className="w-36">Time</TableHead>
                   <TableHead>Prompt</TableHead>
-                  <TableHead className="w-28">Type</TableHead>
+                  <TableHead className="w-28 text-right">Type</TableHead>
                   <TableHead className="w-20 text-right">Length</TableHead>
                   <TableHead className="w-36">Project</TableHead>
                 </TableRow>
@@ -186,12 +188,12 @@ export default async function PromptsPage({ searchParams }: PromptsPageProps) {
                         {truncate(p.prompt_text)}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       <Badge
                         variant="secondary"
                         className={`text-xs ${PROMPT_TYPE_COLORS[p.prompt_type ?? 'natural'] ?? ''}`}
                       >
-                        {PROMPT_TYPE_LABELS[p.prompt_type ?? 'natural'] ?? 'Natural'}
+                        {PROMPT_TYPE_LABELS[p.prompt_type ?? 'natural'] ?? '자연어'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs text-muted-foreground">

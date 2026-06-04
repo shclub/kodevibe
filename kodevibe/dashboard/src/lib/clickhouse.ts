@@ -48,6 +48,8 @@ export interface SessionSummary {
   output_tokens: number
   premium_requests: number
   source: string
+  tool: string   // 'vscode' | 'cli'
+  user_email: string
   is_closed: number
 }
 
@@ -73,6 +75,14 @@ const USER_MATCH_CONDITION = `(
   OR ResourceAttributes['zeude.user.email'] = {userEmail:String}
   OR LogAttributes['user.email'] = {userEmail:String}
 )`
+
+// Admin (empty email+id) → match all users; otherwise restrict to the user.
+function userMatch(userEmail: string, userId: string): string {
+  return (!userEmail && !userId) ? '1=1' : USER_MATCH_CONDITION
+}
+function userParams(userEmail: string, userId: string): Record<string, string> {
+  return (!userEmail && !userId) ? {} : { userEmail, userId }
+}
 
 // Helper to build source filter condition for claude_code_logs (raw log table).
 // Uses ServiceName to identify the tool. Everything not matching a known tool is 'claude'.
@@ -160,9 +170,24 @@ const COST_EXPR = `sum(
   )
 )`
 
-async function _getSessionsToday(userEmail: string, userId: string = '', source: SourceFilter = 'all', from?: string, to?: string): Promise<SessionSummary[]> {
+async function _getSessionsToday(
+  userEmail: string, userId: string = '',
+  source: SourceFilter = 'all', from?: string, to?: string,
+  searchSessionId?: string, searchUser?: string
+): Promise<SessionSummary[]> {
   const sourceCondition = buildSourceCondition(source)
   const dateFilter = buildDateFilter(from, to)
+
+  // Search conditions
+  const sessionIdCond = searchSessionId
+    ? `AND LogAttributes['session.id'] ILIKE {searchSessionId:String}` : ''
+  const searchUserCond = searchUser
+    ? `AND (LogAttributes['user.email'] ILIKE {searchUser:String} OR ResourceAttributes['zeude.user.email'] ILIKE {searchUser:String})` : ''
+
+  // Admin or search → bypass USER_MATCH_CONDITION
+  const isAdmin = userEmail === '' && userId === ''
+  const userCondition = (searchSessionId || searchUser || isAdmin) ? '1=1' : USER_MATCH_CONDITION
+
   const result = await clickhouse.query({
     query: `
       SELECT
@@ -180,17 +205,33 @@ async function _getSessionsToday(userEmail: string, userId: string = '', source:
           any(ServiceName) ILIKE 'copilot%', 'copilot',
           'claude'
         ) as source,
+        if(any(ServiceName) ILIKE 'copilot%', 'vscode', 'cli') as tool,
+        coalesce(
+          nullIf(anyIf(LogAttributes['user.email'], LogAttributes['user.email'] != ''), ''),
+          nullIf(anyIf(ResourceAttributes['zeude.user.email'], ResourceAttributes['zeude.user.email'] != ''), ''),
+          ''
+        ) as user_email,
         if(countIf(Body IN ('session.shutdown', 'session.end')) > 0 OR dateDiff('minute', max(Timestamp), now()) > 60, 1, 0) as is_closed
       FROM claude_code_logs
       ${PRICING_JOIN}
-      WHERE ${USER_MATCH_CONDITION}
+      WHERE ${userCondition}
         ${dateFilter}
         ${sourceCondition}
+        ${sessionIdCond}
+        ${searchUserCond}
       GROUP BY session_id
-      HAVING session_id != '' AND countIf(Body LIKE '%api_request') > 0
+      HAVING session_id != '' AND (
+        countIf(Body LIKE '%api_request') > 0 OR
+        countIf(Body = 'copilot.chat_request') > 0
+      )
       ORDER BY started_at DESC
     `,
-    query_params: { userEmail, userId },
+    query_params: {
+      // Only include userEmail/userId when USER_MATCH_CONDITION is active
+      ...(userCondition !== '1=1' ? { userEmail, userId } : {}),
+      ...(searchSessionId ? { searchSessionId: `%${searchSessionId}%` } : {}),
+      ...(searchUser ? { searchUser: `%${searchUser}%` } : {}),
+    },
     format: 'JSONEachRow',
   })
   return result.json()
@@ -245,17 +286,17 @@ async function _getOverviewStats(userEmail: string, userId: string = '', source:
   const result = await clickhouse.query({
     query: `
       SELECT
-        count(DISTINCT LogAttributes['session.id']) as total_sessions,
+        count(DISTINCT if(Body LIKE '%api_request' OR Body = 'copilot.chat_request', LogAttributes['session.id'], NULL)) as total_sessions,
         ${COST_EXPR} as total_cost,
         ${INPUT_TOKENS_EXPR} as total_input_tokens,
         sum(toInt64OrZero(LogAttributes['output_tokens'])) as total_output_tokens
       FROM claude_code_logs
       ${PRICING_JOIN}
-      WHERE ${USER_MATCH_CONDITION}
+      WHERE ${userMatch(userEmail, userId)}
         ${dateFilter}
         ${sourceCondition}
     `,
-    query_params: { userEmail, userId },
+    query_params: { ...userParams(userEmail, userId) },
     format: 'JSONEachRow',
   })
   const rows = (await result.json()) as OverviewStats[]
@@ -293,30 +334,30 @@ async function _getTodayStatsBySource(userEmail: string, userId: string = '', fr
             ServiceName ILIKE 'copilot%', 'copilot',
             'claude'
           ) as source,
-          count(DISTINCT LogAttributes['session.id']) as sessions,
+          count(DISTINCT if(Body LIKE '%api_request' OR Body = 'copilot.chat_request', LogAttributes['session.id'], NULL)) as sessions,
           ${COST_EXPR} as cost,
           ${INPUT_TOKENS_EXPR} as input_tokens,
           sum(toInt64OrZero(LogAttributes['output_tokens'])) as output_tokens
         FROM claude_code_logs
         ${PRICING_JOIN}
-        WHERE ${USER_MATCH_CONDITION}
+        WHERE ${userMatch(userEmail, userId)}
           ${dateFilter}
         GROUP BY source
         ORDER BY source
       `,
-      query_params: { userEmail, userId },
+      query_params: { ...userParams(userEmail, userId) },
       format: 'JSONEachRow',
     }),
     clickhouse.query({
       query: `
         SELECT source, sum(invocation_count) as invocations
         FROM tool_invocations_daily
-        WHERE (user_id = {userId:String} OR user_email = {userEmail:String})
+        WHERE ${(!userEmail && !userId) ? '1=1' : '(user_id = {userId:String} OR user_email = {userEmail:String})'}
           ${invDateFilter}
           AND source IN ('copilot', 'opencode')
         GROUP BY source
       `,
-      query_params: { userEmail, userId },
+      query_params: { ...userParams(userEmail, userId) },
       format: 'JSONEachRow',
     }),
   ])
@@ -447,7 +488,9 @@ export interface SessionEvent {
   attributes: Record<string, string>
 }
 
-export async function getSessionDetails(userEmail: string, userId: string, sessionId: string): Promise<SessionEvent[]> {
+export async function getSessionDetails(userEmail: string, userId: string, sessionId: string, isAdmin = false): Promise<SessionEvent[]> {
+  // Admin can view any session by ID without user filtering
+  const userCond = isAdmin ? '' : `AND ${USER_MATCH_CONDITION}`
   const result = await clickhouse.query({
     query: `
       SELECT
@@ -475,11 +518,11 @@ export async function getSessionDetails(userEmail: string, userId: string, sessi
         LogAttributes as attributes
       FROM claude_code_logs
       ${PRICING_JOIN}
-      WHERE ${USER_MATCH_CONDITION}
-        AND LogAttributes['session.id'] = {sessionId:String}
+      WHERE LogAttributes['session.id'] = {sessionId:String}
+        ${userCond}
       ORDER BY Timestamp ASC
     `,
-    query_params: { userEmail, userId, sessionId },
+    query_params: { ...(isAdmin ? {} : { userEmail, userId }), sessionId },
     format: 'JSONEachRow',
   })
   return result.json()
@@ -562,16 +605,16 @@ export async function getTopModelsByUsage(
         ${COST_EXPR} as total_cost
       FROM claude_code_logs
       ${PRICING_JOIN}
-      WHERE ${USER_MATCH_CONDITION}
+      WHERE ${userMatch(userEmail, userId)}
         ${dateFilter}
         ${sourceCondition}
-        AND Body LIKE '%api_request'
+        AND (Body LIKE '%api_request' OR Body = 'copilot.chat_request')
         AND LogAttributes['model'] != ''
       GROUP BY model
       ORDER BY call_count DESC
       LIMIT {limit:UInt32}
     `,
-    query_params: { userEmail, userId, limit },
+    query_params: { ...userParams(userEmail, userId), limit },
     format: 'JSONEachRow',
   })
   const rows = (await result.json()) as Record<string, string>[]

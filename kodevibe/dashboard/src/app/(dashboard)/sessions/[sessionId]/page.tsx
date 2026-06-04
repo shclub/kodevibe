@@ -48,8 +48,8 @@ function formatNum(n: number) {
 
 // ── Event name helpers (support both prefixed and bare names) ───────────────
 
-function isUserPromptEvent(name: string)  { return name === 'claude_code.user_prompt' }
-function isApiRequestEvent(name: string)  { return name === 'claude_code.api_request' || name === 'api_request' }
+function isUserPromptEvent(name: string)  { return name === 'claude_code.user_prompt' || name === 'copilot.user_prompt' }
+function isApiRequestEvent(name: string)  { return name === 'claude_code.api_request' || name === 'api_request' || name === 'copilot.chat_request' }
 function isToolDecisionEvent(name: string){ return name === 'claude_code.tool_decision' }
 function isCompactionEvent(name: string)  { return name === 'claude_code.compaction' }
 
@@ -425,12 +425,13 @@ export default async function SessionDetailPage({ params, searchParams }: Sessio
   if (viewUser) backParams.push(`viewUser=${encodeURIComponent(viewUser)}`)
   const backQuery = backParams.length ? `?${backParams.join('&')}` : ''
 
+  const isAdmin = user.role === 'admin'
   const queryEmail = viewUser ? '' : (user.email ?? '')
   const queryUserId = viewUser || user.id
 
   let events: SessionEvent[] = []
   try {
-    events = await getSessionDetails(queryEmail, queryUserId, sessionId)
+    events = await getSessionDetails(queryEmail, queryUserId, sessionId, isAdmin)
   } catch (err) {
     console.error('Failed to fetch session details:', err)
   }
@@ -441,6 +442,11 @@ export default async function SessionDetailPage({ params, searchParams }: Sessio
   const endedAt = events[events.length - 1].timestamp
   const { turns, hasNoTurns } = groupIntoTurns(events)
   const compactionCount = events.filter(e => isCompactionEvent(e.event_name)).length
+
+  // Actual session owner (not the logged-in viewer) from event attributes
+  const sessionEmail =
+    events.find(e => e.attributes?.['user.email'])?.attributes['user.email'] ||
+    (viewUser ? viewUser : (user.email ?? ''))
 
   return (
     <div className="space-y-6">
@@ -457,7 +463,7 @@ export default async function SessionDetailPage({ params, searchParams }: Sessio
               <span className="font-mono text-sm">{sessionId}</span>
               <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
                 <User className="h-3 w-3" />
-                {user.email}
+                {sessionEmail}
               </span>
               <span className="text-xs">{formatDateTime(startedAt)} → {formatTime(endedAt)}</span>
             </div>

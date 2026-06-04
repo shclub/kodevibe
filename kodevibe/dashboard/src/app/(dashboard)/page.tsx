@@ -29,7 +29,7 @@ const PROMPT_TYPE_COLORS: Record<string, string> = {
 }
 
 const PROMPT_TYPE_LABELS: Record<string, string> = {
-  natural:  'Natural',
+  natural:  '자연어',
   skill:    'Skill',
   command:  'Command',
   agent:    'Agent',
@@ -145,12 +145,17 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   let topModels: ModelUsageStat[] = []
   let topPrompts: TopPromptStat[] = []
 
+  // Admin sees org-wide stats; regular users see only their own.
+  const isAdmin = user.role === 'admin'
+  const qEmail = isAdmin ? '' : user.email
+  const qUserId = isAdmin ? '' : user.id
+
   try {
     const fetches = await Promise.all([
-      getOverviewStats(user.email, user.id, source, from, to),
-      source === 'all' ? getTodayStatsBySource(user.email, user.id, from, to) : Promise.resolve([]),
-      getTopModelsByUsage(user.email, user.id, source, from, to),
-      getTopPromptsByCount({ userId: user.id, userEmail: user.email }, from, to, source),
+      getOverviewStats(qEmail, qUserId, source, from, to),
+      source === 'all' ? getTodayStatsBySource(qEmail, qUserId, from, to) : Promise.resolve([]),
+      getTopModelsByUsage(qEmail, qUserId, source, from, to),
+      getTopPromptsByCount({ userId: qUserId, userEmail: qEmail }, from, to, source),
     ])
     todayStats = fetches[0]
     sourceStats = fetches[1]
@@ -284,7 +289,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
                         variant="secondary"
                         className={`text-xs ${PROMPT_TYPE_COLORS[p.prompt_type] ?? PROMPT_TYPE_COLORS.natural}`}
                       >
-                        {PROMPT_TYPE_LABELS[p.prompt_type] ?? 'Natural'}
+                        {PROMPT_TYPE_LABELS[p.prompt_type] ?? '자연어'}
                       </Badge>
                       <span className="font-mono text-sm font-semibold text-violet-600">
                         {p.count}×

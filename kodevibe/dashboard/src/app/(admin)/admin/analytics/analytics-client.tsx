@@ -926,7 +926,7 @@ export default function AnalyticsClient() {
                     {skillData.promptTypeStats.map((stat) => (
                       <div key={stat.prompt_type} className="flex justify-between text-sm">
                         <span className="capitalize text-muted-foreground">
-                          {stat.prompt_type === 'natural' ? 'Natural Language' : stat.prompt_type}
+                          {stat.prompt_type === 'natural' ? '자연어' : stat.prompt_type}
                         </span>
                         <span className="font-mono">
                           {stat.count.toLocaleString()} ({stat.percentage}%)

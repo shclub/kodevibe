@@ -6,7 +6,5 @@ out/**
 tsconfig.json
 **/*.map
 node_modules/**
-node_modules/**
-dist/**
 *.vsix
 package-lock.json

@@ -1,6 +1,8 @@
 import * as https from 'https'
 import * as http from 'http'
 import { randomUUID } from 'crypto'
+// newSessionId kept for backward compatibility but vscode.env.sessionId is preferred
+
 
 export interface LogEvent {
   timestamp: string   // ISO

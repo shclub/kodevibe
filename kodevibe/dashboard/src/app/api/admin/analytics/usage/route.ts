@@ -159,7 +159,7 @@ export async function GET(req: Request) {
               request_count
             FROM (
               SELECT
-                user_id,
+                if(user_id != '', user_id, user_email) as user_id,
                 any(user_email) as user_email,
                 sum(input_tokens) as input_tokens,
                 sum(output_tokens) as output_tokens,
@@ -168,7 +168,7 @@ export async function GET(req: Request) {
                 sum(request_count) as request_count
               FROM token_usage_hourly
               WHERE hour >= now() - INTERVAL ${days} DAY
-                AND user_id != ''
+                AND (user_id != '' OR user_email != '')
                 ${sourceFilter}
               GROUP BY user_id
             )
@@ -176,6 +176,7 @@ export async function GET(req: Request) {
             ORDER BY (input_tokens + output_tokens + cache_read_tokens) DESC
             LIMIT {limit:UInt32}
             OFFSET {offset:UInt32}
+            SETTINGS prefer_column_name_to_alias = 1
           `,
           query_params: userQueryParams,
           format: 'JSONEachRow',
@@ -187,15 +188,16 @@ export async function GET(req: Request) {
             SELECT count() as total_users
             FROM (
               SELECT
-                user_id,
+                if(user_id != '', user_id, user_email) as user_id,
                 any(user_email) as user_email
               FROM token_usage_hourly
               WHERE hour >= now() - INTERVAL ${days} DAY
-                AND user_id != ''
+                AND (user_id != '' OR user_email != '')
                 ${sourceFilter}
               GROUP BY user_id
             )
             ${searchClause}
+            SETTINGS prefer_column_name_to_alias = 1
           `,
           query_params: search ? { search } : undefined,
           format: 'JSONEachRow',

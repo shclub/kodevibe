@@ -12,6 +12,8 @@ import { DateFilter } from '@/components/dashboard/date-filter'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import TopDurationSessions from '@/components/dashboard/top-duration-sessions'
+import { SessionUserSelector } from '@/components/sessions/user-selector'
+import { SessionSearchBar } from '@/components/sessions/search-bar'
 
 const SOURCE_COLORS: Record<string, string> = {
   claude: 'bg-blue-100 text-blue-800',
@@ -31,6 +33,19 @@ function SourceBadge({ source }: { source: string }) {
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors}`}>
       {SOURCE_LABELS[source] ?? source}
+    </span>
+  )
+}
+
+function ToolBadge({ tool }: { tool: string }) {
+  if (tool === 'vscode') return (
+    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-800">
+      VS Code
+    </span>
+  )
+  return (
+    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700">
+      CLI
     </span>
   )
 }
@@ -61,7 +76,7 @@ function formatTime(timestamp: string): string {
 }
 
 interface SessionsPageProps {
-  searchParams: Promise<{ source?: string; from?: string; to?: string; viewUser?: string }>
+  searchParams: Promise<{ source?: string; from?: string; to?: string; viewUser?: string; searchSessionId?: string; searchUser?: string }>
 }
 
 export const dynamic = 'force-dynamic'
@@ -73,15 +88,35 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
   const from = params.from
   const to = params.to
   const viewUser = params.viewUser
+  const searchSessionId = params.searchSessionId
+  const searchUser = params.searchUser
+  const isAdmin = user.role === 'admin'
 
-  // If viewUser is provided (from leaderboard click), query that user's sessions
-  const queryEmail = viewUser ? '' : (user.email ?? '')
-  const queryUserId = viewUser || user.id
+  // Resolve query identity:
+  // - search by session/user → bypass user filter (handled in query)
+  // - viewUser → that specific user
+  // - admin (no viewUser) → all users (empty email + id)
+  // - regular user → own sessions
+  let queryEmail: string
+  let queryUserId: string
+  if (searchSessionId || searchUser) {
+    queryEmail = ''
+    queryUserId = ''
+  } else if (viewUser) {
+    queryEmail = ''
+    queryUserId = viewUser
+  } else if (isAdmin) {
+    queryEmail = ''
+    queryUserId = ''
+  } else {
+    queryEmail = user.email ?? ''
+    queryUserId = user.id
+  }
 
   let sessions: SessionSummary[] = []
 
   try {
-    sessions = await getSessionsToday(queryEmail, queryUserId, source, from, to)
+    sessions = await getSessionsToday(queryEmail, queryUserId, source, from, to, searchSessionId, searchUser)
   } catch (error) {
     console.error('Failed to fetch sessions:', error)
   }
@@ -106,7 +141,7 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
             {viewUser ? `Sessions for user (${dateLabel})` : `Browse your coding sessions (${dateLabel})`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <DateFilter from={from} to={to} />
           <SourceFilterComponent useSearchParams />
         </div>
@@ -114,10 +149,18 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
 
       <Card>
         <CardHeader>
-          <CardTitle>Sessions</CardTitle>
-          <CardDescription>
-            {sessions.length} session{sessions.length !== 1 ? 's' : ''} recorded
-          </CardDescription>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <CardTitle>Sessions</CardTitle>
+              <CardDescription>
+                {sessions.length} session{sessions.length !== 1 ? 's' : ''} recorded
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {isAdmin && <SessionUserSelector currentEmail={viewUser} />}
+              <SessionSearchBar />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {sessions.length === 0 ? (
@@ -131,13 +174,14 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
                   <TableHead>Session ID</TableHead>
                   <TableHead>User</TableHead>
                   {showSourceColumn && <TableHead>Source</TableHead>}
+                  <TableHead>Tool</TableHead>
                   <TableHead>Started</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Events</TableHead>
                   <TableHead>Input Tokens</TableHead>
                   <TableHead>Output Tokens</TableHead>
-                  <TableHead>Premium Req</TableHead>
+                  <TableHead>AI Credits</TableHead>
                   <TableHead className="text-right">Cost</TableHead>
                 </TableRow>
               </TableHeader>
@@ -152,13 +196,16 @@ export default async function SessionsPage({ searchParams }: SessionsPageProps) 
                         </Link>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {viewUser ? viewUser.slice(0, 12) + '…' : (user.email ?? '')}
+                        {session.user_email || (viewUser ? viewUser : (user.email ?? ''))}
                       </TableCell>
                       {showSourceColumn && (
                         <TableCell>
                           <SourceBadge source={session.source} />
                         </TableCell>
                       )}
+                      <TableCell>
+                        <ToolBadge tool={session.tool ?? 'cli'} />
+                      </TableCell>
                       <TableCell>
                         <Link href={href} className="block">
                           {formatTime(session.started_at)}

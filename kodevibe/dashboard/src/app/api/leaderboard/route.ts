@@ -111,17 +111,20 @@ export async function GET(req: Request) {
         // [0] Current week top token users (week resets Monday 08:00 KST)
         clickhouse.query({
           query: `
-            SELECT
-              user_id,
-              any(user_email) as user_email,
-              sum(input_tokens + output_tokens + cache_read_tokens) as total_tokens
-            FROM token_usage_hourly
-            WHERE hour >= toDateTime(${tokenCurrentStartEpoch})
-              AND hour < toDateTime(${weekWindow.currentEndEpoch})
-              AND user_id != ''
-              ${tokenCohortClause}
-              ${sourceFilter}
-            GROUP BY user_id
+            SELECT if(uid != '', uid, ue) as user_id, ue as user_email, total_tokens
+            FROM (
+              SELECT
+                if(user_id != '', user_id, user_email) as uid,
+                any(user_email) as ue,
+                sum(input_tokens + output_tokens + cache_read_tokens) as total_tokens
+              FROM token_usage_hourly
+              WHERE hour >= toDateTime(${tokenCurrentStartEpoch})
+                AND hour < toDateTime(${weekWindow.currentEndEpoch})
+                AND (user_id != '' OR user_email != '')
+                ${tokenCohortClause}
+                ${sourceFilter}
+              GROUP BY uid
+            )
             ORDER BY total_tokens DESC
             LIMIT 10
           `,
@@ -131,17 +134,20 @@ export async function GET(req: Request) {
         // [1] Previous week top token users (last Monday 08:00 KST cycle)
         clickhouse.query({
           query: `
-            SELECT
-              user_id,
-              any(user_email) as user_email,
-              sum(input_tokens + output_tokens + cache_read_tokens) as total_tokens
-            FROM token_usage_hourly
-            WHERE hour >= toDateTime(${tokenPreviousStartEpoch})
-              AND hour < toDateTime(${tokenPreviousEndEpoch})
-              AND user_id != ''
-              ${tokenCohortClause}
-              ${sourceFilter}
-            GROUP BY user_id
+            SELECT if(uid != '', uid, ue) as user_id, ue as user_email, total_tokens
+            FROM (
+              SELECT
+                if(user_id != '', user_id, user_email) as uid,
+                any(user_email) as ue,
+                sum(input_tokens + output_tokens + cache_read_tokens) as total_tokens
+              FROM token_usage_hourly
+              WHERE hour >= toDateTime(${tokenPreviousStartEpoch})
+                AND hour < toDateTime(${tokenPreviousEndEpoch})
+                AND (user_id != '' OR user_email != '')
+                ${tokenCohortClause}
+                ${sourceFilter}
+              GROUP BY uid
+            )
             ORDER BY total_tokens DESC
             LIMIT 10
           `,

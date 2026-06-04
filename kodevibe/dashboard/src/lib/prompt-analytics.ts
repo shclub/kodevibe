@@ -67,8 +67,8 @@ function buildUserWhereClause(identifier: UserIdentifier): { clause: string; par
       params: { userEmail: identifier.userEmail }
     }
   }
-  // Fallback: match nothing
-  return { clause: '1 = 0', params: {} }
+  // No identifier → match ALL users (admin org-wide view)
+  return { clause: '1 = 1', params: {} }
 }
 
 // Get recent prompts for a user

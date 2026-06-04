@@ -21,7 +21,9 @@ export default async function DashboardLayout({
       {/* Sidebar */}
       <aside className="w-64 border-r bg-muted/30 p-4 flex flex-col">
         <div className="flex items-center gap-2 mb-6">
-          <img src="/kodecrew.jpg" alt="kode:crew" className="h-14" />
+          <a href="/" className="cursor-pointer" title="홈으로 이동 (새로고침)">
+            <img src="/kodecrew.jpg" alt="kode:crew" className="h-14 hover:opacity-80 transition-opacity" />
+          </a>
         </div>
 
         <DashboardNav isAdmin={isAdmin} />
