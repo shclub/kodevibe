@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -83,8 +82,6 @@ func (br *backgroundReporter) report() {
 	if len(turns) == 0 {
 		return
 	}
-
-	fmt.Fprintf(os.Stderr, "[opencode] background: sending %d new turns\n", len(turns))
 
 	var maxTimestamp int64 = sinceMs
 	for _, turn := range turns {
