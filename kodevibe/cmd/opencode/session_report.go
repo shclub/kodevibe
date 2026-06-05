@@ -35,8 +35,9 @@ type openCodeTurn struct {
 }
 
 // runSQLite executes a query against dbPath via the sqlite3 CLI.
+// Uses readonly mode to avoid blocking OpenCode's writes.
 func runSQLite(dbPath, query string) ([][]string, error) {
-	out, err := exec.Command("sqlite3", "-separator", "\t", dbPath, query).Output()
+	out, err := exec.Command("sqlite3", "-readonly", "-separator", "\t", dbPath, query).Output()
 	if err != nil {
 		return nil, err
 	}
@@ -152,9 +153,7 @@ func reportOpenCodeSessions(syncResult mcpconfig.SyncResult, endpoint string, si
 
 	// Give opencode a moment to flush WAL before reading.
 	// OpenCode may write token data asynchronously just before exit.
-	time.Sleep(1 * time.Second)
-	// WAL checkpoint: flush WAL to main DB file so our read sees committed data.
-	_, _ = runSQLite(dbPath, "PRAGMA wal_checkpoint(PASSIVE);")
+	time.Sleep(500 * time.Millisecond)
 
 	var turns []openCodeTurn
 	var err error
@@ -162,8 +161,7 @@ func reportOpenCodeSessions(syncResult mcpconfig.SyncResult, endpoint string, si
 	// Retry up to 3 times: token writes may lag slightly behind process exit.
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(attempt) * time.Second)
-			_, _ = runSQLite(dbPath, "PRAGMA wal_checkpoint(PASSIVE);")
+			time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
 		}
 		turns, err = readTurnsSince(dbPath, sinceMs)
 		if err != nil {
