@@ -38,10 +38,10 @@ async function getSystemPrompt(db: ReturnType<typeof createServerClient>): Promi
 }
 
 function isApiRequest(name: string) {
-  return name === 'claude_code.api_request' || name === 'api_request'
+  return name === 'claude_code.api_request' || name === 'api_request' || name === 'copilot.chat_request'
 }
 function isUserPrompt(name: string) {
-  return name === 'claude_code.user_prompt'
+  return name === 'claude_code.user_prompt' || name === 'copilot.user_prompt'
 }
 function isToolDecision(name: string) {
   return name === 'claude_code.tool_decision'
