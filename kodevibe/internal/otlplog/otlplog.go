@@ -25,6 +25,7 @@ type TokenUsageParams struct {
 	PromptID         string    // turn ID (message ID), used to group events per turn
 	Model            string    // model ID
 	Prompt           string    // user prompt text for this turn (may be empty)
+	Response         string    // assistant response text for this turn (may be empty)
 	InputTokens      int64
 	OutputTokens     int64
 	CacheReadTokens  int64
@@ -91,6 +92,10 @@ func SendTokenUsage(p TokenUsageParams) {
 		logAttrs = append(logAttrs, kv{Key: "prompt", Value: kvString{p.Prompt}})
 		logAttrs = append(logAttrs, kv{Key: "prompt_length", Value: kvString{fmt.Sprintf("%d", len([]rune(p.Prompt)))}})
 	}
+		if p.Response != "" {
+			logAttrs = append(logAttrs, kv{Key: "response", Value: kvString{p.Response}})
+			logAttrs = append(logAttrs, kv{Key: "response_length", Value: kvString{fmt.Sprintf("%d", len([]rune(p.Response)))}})
+		}
 
 	payload := otlpLogsPayload{
 		ResourceLogs: []otlpResourceLogs{{

@@ -98,6 +98,7 @@ func (br *backgroundReporter) report() {
 			PromptID:        turn.userMessageID,
 			Model:           turn.model,
 			Prompt:          turn.promptText,
+				Response:       turn.responseText,
 			InputTokens:     turn.inputTokens,
 			OutputTokens:    turn.outputTokens,
 			CacheReadTokens: turn.cacheReadTokens,

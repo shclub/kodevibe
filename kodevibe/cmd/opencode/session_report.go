@@ -28,6 +28,7 @@ type openCodeTurn struct {
 	userMessageID   string // used as prompt.id for turn grouping in dashboard
 	model           string
 	promptText      string
+	responseText    string
 	inputTokens     int64
 	outputTokens    int64
 	cacheReadTokens int64
@@ -69,6 +70,9 @@ SELECT
              WHERE p.message_id=m.id AND json_extract(p.data,'$.type')='text'
              ORDER BY p.time_created LIMIT 1),''),
   m.time_created
+	  COALESCE((SELECT json_extract(p.data,'$.text') FROM part p
+	             WHERE p.message_id=m.id AND json_extract(p.data,'$.type')='response'
+	             ORDER BY p.time_created LIMIT 1),''),
 FROM message m
 WHERE m.time_created >= %d
 ORDER BY m.session_id, m.time_created
@@ -88,12 +92,13 @@ ORDER BY m.session_id, m.time_created
 		outputTok   int64
 		cacheRead   int64
 		text        string
+			responseText string
 		timeCreated int64
 	}
 
 	var msgs []msgRow
 	for _, row := range rows {
-		if len(row) < 9 {
+		if len(row) < 10 {
 			continue
 		}
 		msgs = append(msgs, msgRow{
@@ -106,6 +111,7 @@ ORDER BY m.session_id, m.time_created
 			cacheRead:   parseInt64(row[6]),
 			text:        row[7],
 			timeCreated: parseInt64(row[8]),
+			responseText: row[9],
 		})
 	}
 
@@ -129,6 +135,7 @@ ORDER BY m.session_id, m.time_created
 					userMessageID:   msg.id,
 					model:           next.model,
 					promptText:      msg.text,
+						responseText:    next.responseText,
 					inputTokens:     next.inputTok,
 					outputTokens:    next.outputTok,
 					cacheReadTokens: next.cacheRead,
@@ -191,6 +198,7 @@ func reportOpenCodeSessions(syncResult mcpconfig.SyncResult, endpoint string, si
 			PromptID:        turn.userMessageID,
 			Model:           turn.model,
 			Prompt:          turn.promptText,
+				Response:       turn.responseText,
 			InputTokens:     turn.inputTokens,
 			OutputTokens:    turn.outputTokens,
 			CacheReadTokens: turn.cacheReadTokens,
