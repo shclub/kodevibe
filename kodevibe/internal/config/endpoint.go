@@ -125,3 +125,32 @@ func GetReportInterval(defaultValue int) int {
 
 	return defaultValue
 }
+
+// GetCollectResponse returns whether to collect assistant response text for a given source.
+// Reads collect_response_{source} from config file (env > config > defaultValue).
+func GetCollectResponse(source string, defaultValue bool) bool {
+	// Check environment variable first
+	envKey := fmt.Sprintf("ZEUDE_COLLECT_RESPONSE_%s", strings.ToUpper(source))
+	if val := os.Getenv(envKey); val != "" {
+		return val == "true" || val == "1"
+	}
+
+	// Try to read from config file
+	home, err := os.UserHomeDir()
+	if err == nil {
+		configPath := filepath.Join(home, ".zeude", "config")
+		if data, err := os.ReadFile(configPath); err == nil {
+			lines := strings.Split(string(data), "\n")
+			configKey := fmt.Sprintf("collect_response_%s", source)
+			for _, line := range lines {
+				if strings.HasPrefix(line, configKey+"=") {
+					value := strings.TrimPrefix(line, configKey+"=")
+					trimmed := strings.TrimSpace(value)
+					return trimmed == "true" || trimmed == "1"
+				}
+			}
+		}
+	}
+
+	return defaultValue
+}

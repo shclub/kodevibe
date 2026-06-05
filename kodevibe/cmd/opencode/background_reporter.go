@@ -83,10 +83,18 @@ func (br *backgroundReporter) report() {
 		return
 	}
 
+	// Check if response collection is enabled for opencode
+	collectResponse := config.GetCollectResponse("opencode", true)
+
 	var maxTimestamp int64 = sinceMs
 	for _, turn := range turns {
 		if turn.timestampMs > maxTimestamp {
 			maxTimestamp = turn.timestampMs
+		}
+		// Only include response if enabled
+		responseText := ""
+		if collectResponse {
+			responseText = turn.responseText
 		}
 		otlplog.SendTokenUsage(otlplog.TokenUsageParams{
 			Endpoint:        endpoint,
@@ -98,7 +106,7 @@ func (br *backgroundReporter) report() {
 			PromptID:        turn.userMessageID,
 			Model:           turn.model,
 			Prompt:          turn.promptText,
-				Response:       turn.responseText,
+				Response:       responseText,
 			InputTokens:     turn.inputTokens,
 			OutputTokens:    turn.outputTokens,
 			CacheReadTokens: turn.cacheReadTokens,

@@ -186,6 +186,111 @@ function SystemPromptSettings() {
   )
 }
 
+// ── Output Prompt Collection Settings ─────────────────────────────────────────────
+
+const AI_SOURCES = [
+  { id: 'claude', name: 'Claude Code', color: 'bg-blue-100 text-blue-800' },
+  { id: 'codex', name: 'Codex', color: 'bg-emerald-100 text-emerald-800' },
+  { id: 'copilot', name: 'GitHub Copilot', color: 'bg-purple-100 text-purple-800' },
+  { id: 'opencode', name: 'OpenCode', color: 'bg-orange-100 text-orange-800' },
+] as const
+
+function OutputPromptSettings() {
+  const [settings, setSettings] = useState<Record<string, boolean>>({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then(r => r.json())
+      .then(d => {
+        const parsed: Record<string, boolean> = {}
+        for (const source of AI_SOURCES) {
+          const key = `collect_response_${source.id}`
+          parsed[source.id] = d[key] === 'true'
+        }
+        setSettings(parsed)
+        setLoading(false)
+      })
+      .catch(() => { setError('Failed to load'); setLoading(false) })
+  }, [])
+
+  async function save() {
+    setSaving(true); setError(''); setSaved(false)
+    try {
+      const updates: Record<string, string> = {}
+      for (const source of AI_SOURCES) {
+        updates[`collect_response_${source.id}`] = settings[source.id] ? 'true' : 'false'
+      }
+      const res = await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+      if (!res.ok) { const d = await res.json(); setError(d.error || 'Failed'); return }
+      setSaved(true); setTimeout(() => setSaved(false), 3000)
+    } catch { setError('Failed to save') }
+    finally { setSaving(false) }
+  }
+
+  function toggle(sourceId: string) {
+    setSettings(s => ({ ...s, [sourceId]: !s[sourceId] }))
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Output Prompt 수집 설정</CardTitle>
+        <CardDescription>
+          AI Source별로 Assistant의 응답 텍스트를 수집할지 설정합니다.
+          개인정보 보호를 위해 필요하지 않은 Source는 끄세요.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <p className="text-sm text-muted-foreground">로딩 중...</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {AI_SOURCES.map(source => (
+              <div
+                key={source.id}
+                className="flex items-center justify-between p-3 rounded-lg border"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${source.color}`}>
+                    {source.name}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggle(source.id)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    settings[source.id] ? 'bg-primary' : 'bg-input'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      settings[source.id] ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {saved && <p className="text-sm text-green-600">저장되었습니다.</p>}
+        <Button onClick={save} disabled={loading || saving}>
+          <Save className="h-4 w-4 mr-2" />
+          {saving ? '저장 중…' : '저장'}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
 function AiConfigurations() {
   const [configs, setConfigs] = useState<AiConfigRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -505,6 +610,7 @@ export default function SettingsPage() {
       <GeneralSettings />
       <AiConfigurations />
       <SystemPromptSettings />
+      <OutputPromptSettings />
     </div>
   )
 }

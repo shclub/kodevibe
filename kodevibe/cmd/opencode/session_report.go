@@ -187,7 +187,15 @@ func reportOpenCodeSessions(syncResult mcpconfig.SyncResult, endpoint string, si
 		endpoint = config.GetCollectorEndpoint(config.DefaultCollectorEndpoint)
 	}
 
+	// Check if response collection is enabled for opencode
+	collectResponse := config.GetCollectResponse("opencode", true)
+
 	for _, turn := range turns {
+		// Only include response if enabled
+		responseText := ""
+		if collectResponse {
+			responseText = turn.responseText
+		}
 		otlplog.SendTokenUsage(otlplog.TokenUsageParams{
 			Endpoint:        endpoint,
 			Service:         "opencode",
@@ -198,7 +206,7 @@ func reportOpenCodeSessions(syncResult mcpconfig.SyncResult, endpoint string, si
 			PromptID:        turn.userMessageID,
 			Model:           turn.model,
 			Prompt:          turn.promptText,
-				Response:       turn.responseText,
+				Response:       responseText,
 			InputTokens:     turn.inputTokens,
 			OutputTokens:    turn.outputTokens,
 			CacheReadTokens: turn.cacheReadTokens,
