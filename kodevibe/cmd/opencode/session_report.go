@@ -29,10 +29,35 @@ type openCodeTurn struct {
 	model           string
 	promptText      string
 	responseText    string
+	projectPath     string
 	inputTokens     int64
 	outputTokens    int64
 	cacheReadTokens int64
 	timestampMs     int64
+}
+
+// gitRootCache memoizes directory → git repo root lookups within a process.
+var gitRootCache = map[string]string{}
+
+// gitRoot returns the git repository root containing dir, so the project is
+// identified by its repo (e.g. "kodevibe") rather than the subfolder the
+// session happened to run in (e.g. "dashboard"). Falls back to dir when it is
+// not inside a git repo or git is unavailable.
+func gitRoot(dir string) string {
+	if dir == "" {
+		return dir
+	}
+	if r, ok := gitRootCache[dir]; ok {
+		return r
+	}
+	root := dir
+	if out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").Output(); err == nil {
+		if t := strings.TrimSpace(string(out)); t != "" {
+			root = t
+		}
+	}
+	gitRootCache[dir] = root
+	return root
 }
 
 // runSQLite executes a query against dbPath via the sqlite3 CLI.
@@ -57,6 +82,10 @@ func runSQLite(dbPath, query string) ([][]string, error) {
 // Filters directly on message.time_created to avoid depending on session.time_updated
 // which may not be updated before opencode exits.
 func readTurnsSince(dbPath string, sinceMs int64) ([]openCodeTurn, error) {
+	// OpenCode stores both prompt and response text as type='text' parts:
+	// the part on a user message is the prompt, the part on the assistant
+	// message is the response. There is no separate 'response' part type.
+	// session.directory holds the cwd, used as the project path.
 	query := fmt.Sprintf(`
 SELECT
   m.session_id,
@@ -69,11 +98,10 @@ SELECT
   COALESCE((SELECT json_extract(p.data,'$.text') FROM part p
              WHERE p.message_id=m.id AND json_extract(p.data,'$.type')='text'
              ORDER BY p.time_created LIMIT 1),''),
+  COALESCE(s.directory,''),
   m.time_created
-	  COALESCE((SELECT json_extract(p.data,'$.text') FROM part p
-	             WHERE p.message_id=m.id AND json_extract(p.data,'$.type')='response'
-	             ORDER BY p.time_created LIMIT 1),''),
 FROM message m
+LEFT JOIN session s ON s.id = m.session_id
 WHERE m.time_created >= %d
 ORDER BY m.session_id, m.time_created
 `, sinceMs)
@@ -92,7 +120,7 @@ ORDER BY m.session_id, m.time_created
 		outputTok   int64
 		cacheRead   int64
 		text        string
-			responseText string
+		directory   string
 		timeCreated int64
 	}
 
@@ -110,8 +138,8 @@ ORDER BY m.session_id, m.time_created
 			outputTok:   parseInt64(row[5]),
 			cacheRead:   parseInt64(row[6]),
 			text:        row[7],
-			timeCreated: parseInt64(row[8]),
-			responseText: row[9],
+			directory:   row[8],
+			timeCreated: parseInt64(row[9]),
 		})
 	}
 
@@ -135,7 +163,8 @@ ORDER BY m.session_id, m.time_created
 					userMessageID:   msg.id,
 					model:           next.model,
 					promptText:      msg.text,
-						responseText:    next.responseText,
+					responseText:    next.text,
+					projectPath:     gitRoot(msg.directory),
 					inputTokens:     next.inputTok,
 					outputTokens:    next.outputTok,
 					cacheReadTokens: next.cacheRead,
@@ -206,7 +235,8 @@ func reportOpenCodeSessions(syncResult mcpconfig.SyncResult, endpoint string, si
 			PromptID:        turn.userMessageID,
 			Model:           turn.model,
 			Prompt:          turn.promptText,
-				Response:       responseText,
+			Response:        responseText,
+			ProjectPath:     turn.projectPath,
 			InputTokens:     turn.inputTokens,
 			OutputTokens:    turn.outputTokens,
 			CacheReadTokens: turn.cacheReadTokens,

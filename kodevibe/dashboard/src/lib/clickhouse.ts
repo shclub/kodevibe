@@ -629,3 +629,65 @@ export async function getTopModelsByUsage(
     total_cost: Number(r.total_cost),
   }))
 }
+
+// ── Compare feature ─────────────────────────────────────────────────────────
+// Session search + source resolution for the admin Compare screen.
+
+// Classify a session's tool from ServiceName. Anything not matching a known
+// tool falls back to 'claude' (same convention as buildSourceCondition).
+const COMPARE_SOURCE_EXPR = `multiIf(
+  ServiceName ILIKE 'copilot%', 'copilot',
+  ServiceName ILIKE 'opencode%', 'opencode',
+  ServiceName ILIKE 'codex%', 'codex',
+  'claude'
+)`
+
+export interface CompareSessionMatch {
+  session_id: string
+  source: string
+  last_at: string
+  prompts: number
+}
+
+// Search sessions by (partial) session id. Empty query returns the most recent
+// sessions. Admin-only feature, so no user filter is applied.
+export async function searchSessionsForCompare(query: string, limit = 15): Promise<CompareSessionMatch[]> {
+  const idCond = query ? `AND LogAttributes['session.id'] ILIKE {q:String}` : ''
+  const result = await clickhouse.query({
+    query: `
+      SELECT
+        LogAttributes['session.id'] as session_id,
+        ${COMPARE_SOURCE_EXPR} as source,
+        max(Timestamp) as last_at,
+        countIf(Body LIKE '%api_request' OR Body = 'copilot.chat_request') as prompts
+      FROM claude_code_logs
+      WHERE LogAttributes['session.id'] != '' ${idCond}
+      GROUP BY session_id, source
+      HAVING prompts > 0
+      ORDER BY last_at DESC
+      LIMIT {limit:UInt32}
+    `,
+    query_params: { ...(query ? { q: `%${query}%` } : {}), limit },
+    format: 'JSONEachRow',
+  })
+  const rows = (await result.json()) as CompareSessionMatch[]
+  return rows.map((r) => ({ ...r, prompts: Number(r.prompts) }))
+}
+
+// Resolve the dominant source/tool for a single session id.
+export async function getSessionSource(sessionId: string): Promise<string> {
+  const result = await clickhouse.query({
+    query: `
+      SELECT ${COMPARE_SOURCE_EXPR} as source
+      FROM claude_code_logs
+      WHERE LogAttributes['session.id'] = {sessionId:String}
+      GROUP BY source
+      ORDER BY count() DESC
+      LIMIT 1
+    `,
+    query_params: { sessionId },
+    format: 'JSONEachRow',
+  })
+  const rows = (await result.json()) as { source: string }[]
+  return rows[0]?.source ?? 'claude'
+}

@@ -16,16 +16,17 @@ import (
 // TokenUsageParams holds the metadata for a token usage log record.
 // Used by the opencode/copilot shims to report per-turn token counts.
 type TokenUsageParams struct {
-	Endpoint         string    // OTLP HTTP endpoint
-	Service          string    // service name (e.g. "opencode")
+	Endpoint         string // OTLP HTTP endpoint
+	Service          string // service name (e.g. "opencode")
 	UserID           string
 	UserEmail        string
 	Team             string
-	SessionID        string    // session ID
-	PromptID         string    // turn ID (message ID), used to group events per turn
-	Model            string    // model ID
-	Prompt           string    // user prompt text for this turn (may be empty)
-	Response         string    // assistant response text for this turn (may be empty)
+	SessionID        string // session ID
+	PromptID         string // turn ID (message ID), used to group events per turn
+	Model            string // model ID
+	Prompt           string // user prompt text for this turn (may be empty)
+	Response         string // assistant response text for this turn (may be empty)
+	ProjectPath      string // project path (cwd)
 	InputTokens      int64
 	OutputTokens     int64
 	CacheReadTokens  int64
@@ -58,6 +59,14 @@ func SendTokenUsage(p TokenUsageParams) {
 	}
 	if p.Team != "" {
 		resAttrs = append(resAttrs, kv{Key: "zeude.team", Value: kvString{p.Team}})
+	}
+	if p.ProjectPath != "" {
+		// Keep the resource attributes for consistency with codex, but the
+		// collector's transform/codex processor only maps them for codex
+		// services — opencode/copilot are skipped. So we also set the log
+		// attributes directly below, which the bridge MVs read.
+		resAttrs = append(resAttrs, kv{Key: "zeude.project_path", Value: kvString{p.ProjectPath}})
+		resAttrs = append(resAttrs, kv{Key: "zeude.working_directory", Value: kvString{p.ProjectPath}})
 	}
 
 	ts := p.Timestamp
@@ -92,10 +101,18 @@ func SendTokenUsage(p TokenUsageParams) {
 		logAttrs = append(logAttrs, kv{Key: "prompt", Value: kvString{p.Prompt}})
 		logAttrs = append(logAttrs, kv{Key: "prompt_length", Value: kvString{fmt.Sprintf("%d", len([]rune(p.Prompt)))}})
 	}
-		if p.Response != "" {
-			logAttrs = append(logAttrs, kv{Key: "response", Value: kvString{p.Response}})
-			logAttrs = append(logAttrs, kv{Key: "response_length", Value: kvString{fmt.Sprintf("%d", len([]rune(p.Response)))}})
-		}
+	if p.Response != "" {
+		logAttrs = append(logAttrs, kv{Key: "response", Value: kvString{p.Response}})
+		logAttrs = append(logAttrs, kv{Key: "response_length", Value: kvString{fmt.Sprintf("%d", len([]rune(p.Response)))}})
+	}
+	if p.ProjectPath != "" {
+		// Set as log attributes directly: the collector's transform/codex
+		// processor that maps zeude.* resource attrs runs only for codex
+		// services, so opencode/copilot must carry these on the log record
+		// itself for the bridge MVs (LogAttributes['project_path']) to read.
+		logAttrs = append(logAttrs, kv{Key: "project_path", Value: kvString{p.ProjectPath}})
+		logAttrs = append(logAttrs, kv{Key: "working_directory", Value: kvString{p.ProjectPath}})
+	}
 
 	payload := otlpLogsPayload{
 		ResourceLogs: []otlpResourceLogs{{

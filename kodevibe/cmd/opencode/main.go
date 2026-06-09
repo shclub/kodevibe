@@ -58,7 +58,6 @@ func main() {
 		}
 	}
 
-
 	// 3. Find real opencode binary
 	realOpencode, err := findRealOpencode()
 	if err != nil {
@@ -130,9 +129,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 10. Stop background reporter and report any remaining turns
+	// 10. Stop background reporter and flush any turns since its last poll.
+	// Use the reporter's own lastReported cursor rather than re-scanning from
+	// sessionStartMs, which would re-send everything the background loop
+	// already reported (the source of duplicate turns).
 	reporter.stop()
-	reportOpenCodeSessions(syncResult, endpoint, sessionStartMs)
+	if reporter != nil {
+		reporter.report()
+	} else {
+		reportOpenCodeSessions(syncResult, endpoint, sessionStartMs)
+	}
 
 	os.Exit(exitCode)
 }

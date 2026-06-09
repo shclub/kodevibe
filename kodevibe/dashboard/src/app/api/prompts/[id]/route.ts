@@ -27,6 +27,8 @@ interface ExistingPrompt {
   invoked_name: string
   project_path: string
   working_directory: string
+  response: string
+  response_length: number
 }
 
 // PATCH: Update prompt_type and invoked_name for an existing prompt
@@ -102,7 +104,7 @@ export async function PATCH(
         SELECT
           prompt_id, session_id, user_id, user_email, team,
           prompt_text, prompt_length, prompt_type, invoked_name,
-          project_path, working_directory
+          project_path, working_directory, response, response_length
         FROM ai_prompts
         WHERE prompt_id = {promptId:String} AND user_id = {userId:String}
         ORDER BY timestamp DESC
@@ -139,6 +141,8 @@ export async function PATCH(
         invoked_name: body.invoked_name !== undefined ? body.invoked_name : existing.invoked_name,
         project_path: existing.project_path,
         working_directory: existing.working_directory,
+        response: existing.response,
+        response_length: existing.response_length,
       }],
       format: 'JSONEachRow',
     })

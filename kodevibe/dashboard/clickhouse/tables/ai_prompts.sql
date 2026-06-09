@@ -31,6 +31,11 @@ CREATE TABLE IF NOT EXISTS ai_prompts (
     project_path String,
     working_directory String,
 
+    -- Assistant response / output prompt (added in migration 018)
+    -- Populated by the opencode/copilot bridge MVs from LogAttributes['response'].
+    response String DEFAULT '',
+    response_length UInt32 DEFAULT 0,
+
     -- Indexing for efficient queries
     INDEX idx_user_id_time (user_id, timestamp) TYPE minmax GRANULARITY 1,
     INDEX idx_user_email_time (user_email, timestamp) TYPE minmax GRANULARITY 1,

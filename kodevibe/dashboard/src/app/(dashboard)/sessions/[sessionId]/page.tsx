@@ -318,6 +318,12 @@ function TurnCard({ turn }: { turn: Turn }) {
                 <span className="text-amber-600">💾 {formatNum(Number(req.cache_creation_tokens))} stored</span>
               )}
             </div>
+            {/* Assistant response text (available for opencode/copilot) */}
+            {req.attributes?.response && (
+              <p className="text-sm text-foreground/80 break-words whitespace-pre-wrap line-clamp-6 pt-0.5">
+                {req.attributes.response}
+              </p>
+            )}
           </div>
           {Number(req.cost_usd) > 0 && (
             <span className="shrink-0 font-mono text-xs text-muted-foreground">
@@ -420,7 +426,7 @@ export default async function SessionDetailPage({ params, searchParams }: Sessio
   const sp = await searchParams
   const viewUser = sp.viewUser
 
-  const backParams = []
+  const backParams: string[] = []
   if (sp.source) backParams.push(`source=${sp.source}`)
   if (viewUser) backParams.push(`viewUser=${encodeURIComponent(viewUser)}`)
   const backQuery = backParams.length ? `?${backParams.join('&')}` : ''

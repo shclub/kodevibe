@@ -106,7 +106,8 @@ func (br *backgroundReporter) report() {
 			PromptID:        turn.userMessageID,
 			Model:           turn.model,
 			Prompt:          turn.promptText,
-				Response:       responseText,
+			Response:        responseText,
+			ProjectPath:     turn.projectPath,
 			InputTokens:     turn.inputTokens,
 			OutputTokens:    turn.outputTokens,
 			CacheReadTokens: turn.cacheReadTokens,
@@ -114,9 +115,14 @@ func (br *backgroundReporter) report() {
 		})
 	}
 
-	// Update lastReported to the latest turn timestamp
+	// Advance past the newest turn we just sent. We add 1ms so the next poll
+	// uses a strict ">" boundary in effect — readTurnsSince filters with ">=",
+	// and re-sending the boundary turn would create duplicates since each
+	// SendTokenUsage emits a fresh event.
 	br.mu.Lock()
-	br.lastReported = maxTimestamp
+	if maxTimestamp >= br.lastReported {
+		br.lastReported = maxTimestamp + 1
+	}
 	br.mu.Unlock()
 }
 

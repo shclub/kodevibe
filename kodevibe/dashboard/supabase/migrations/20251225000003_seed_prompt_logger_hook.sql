@@ -28,6 +28,12 @@ INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r ''.session_id // empty'')
 PROMPT_TEXT=$(echo "$INPUT" | jq -r ''.prompt // empty'')
 CWD=$(echo "$INPUT" | jq -r ''.cwd // empty'')
+# Normalize cwd to the git repo root so the project is identified by its repo
+# (e.g. "kodevibe") rather than whatever subfolder the session ran in.
+if [ -n "$CWD" ]; then
+  GIT_ROOT=$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null)
+  if [ -n "$GIT_ROOT" ]; then CWD="$GIT_ROOT"; fi
+fi
 TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S")
 
 # Skip if no prompt
