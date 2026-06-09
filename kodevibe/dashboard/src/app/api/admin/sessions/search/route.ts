@@ -9,9 +9,6 @@ export async function GET(req: Request) {
     if (!session) {
       return Response.json({ error: 'Not authenticated' }, { status: 401 })
     }
-    if (session.user.role !== 'admin') {
-      return Response.json({ error: 'Admin access required' }, { status: 403 })
-    }
 
     const url = new URL(req.url)
     const q = (url.searchParams.get('q') ?? '').trim()

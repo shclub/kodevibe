@@ -58,6 +58,9 @@ export async function getSessionCompareData(sessionId: string): Promise<SessionC
   if (!events.length) return null
 
   const source = await getSessionSource(sessionId)
+  // Codex/Copilot report input_tokens including cache_read; subtract it to get
+  // the real input (Claude already reports them separately).
+  const cacheInclusive = source === 'copilot' || source === 'codex'
 
   // Group events into turns keyed by prompt_id, same as the detail page.
   const turnMap = new Map<string, CompareTurn & { _ts: number }>()
@@ -106,9 +109,9 @@ export async function getSessionCompareData(sessionId: string): Promise<SessionC
       if (Number(ev.prompt_length) > 0 && turn.promptLength === 0) {
         turn.promptLength = Number(ev.prompt_length)
       }
-      const input = Number(ev.input_tokens)
-      const output = Number(ev.output_tokens)
       const cache = Number(ev.cache_read_tokens)
+      const input = cacheInclusive ? Math.max(0, Number(ev.input_tokens) - cache) : Number(ev.input_tokens)
+      const output = Number(ev.output_tokens)
       turn.inputTokens += input
       turn.outputTokens += output
       turn.cacheReadTokens += cache

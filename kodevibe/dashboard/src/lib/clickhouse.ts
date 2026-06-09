@@ -153,8 +153,11 @@ LEFT JOIN (
 // Normalize input tokens for display: Codex reports full context (new + cached),
 // while Claude Code reports only new tokens. Subtract cache for Codex to make
 // the numbers comparable. Cost calculation (COST_EXPR) still uses full tokens.
+// Codex and Copilot report input_tokens INCLUDING cache_read_tokens, so we
+// subtract cache to get the real (non-cached) input — matching how Claude Code
+// already reports input separately from cache.
 const INPUT_TOKENS_EXPR = `sum(
-  if(ServiceName ILIKE 'codex%',
+  if(ServiceName ILIKE 'codex%' OR ServiceName ILIKE 'copilot%',
     toInt64OrZero(LogAttributes['input_tokens']) - toInt64OrZero(LogAttributes['cache_read_tokens']),
     toInt64OrZero(LogAttributes['input_tokens'])
   )

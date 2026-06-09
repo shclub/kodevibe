@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Users, Server, Bot, Command, Zap, BarChart3, ArrowLeft, LogOut, Settings, GitCompare } from 'lucide-react'
+import { Users, Server, Bot, Command, Zap, BarChart3, ArrowLeft, LogOut, Settings } from 'lucide-react'
 
 const workspaceItems = [
   { href: '/admin/hooks', label: 'Hooks', icon: Zap },
@@ -15,7 +15,6 @@ const workspaceItems = [
 const adminItems = [
   { href: '/admin/team', label: 'Team Members', icon: Users },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/admin/compare', label: 'Compare', icon: GitCompare },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

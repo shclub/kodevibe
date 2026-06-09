@@ -12,8 +12,7 @@ const navItems = [
   { href: '/prompts', label: 'Prompts', icon: MessageSquare },
   { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   { href: '/skills', label: 'My Skills', icon: Command },
-  // Compare is shown to everyone but gated to admins on the page itself.
-  { href: '/admin/compare', label: 'Compare', icon: GitCompare },
+  { href: '/compare', label: 'Compare', icon: GitCompare },
 ]
 
 const workspaceItems = [

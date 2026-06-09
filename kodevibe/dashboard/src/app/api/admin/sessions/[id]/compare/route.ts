@@ -12,9 +12,6 @@ export async function GET(
     if (!session) {
       return Response.json({ error: 'Not authenticated' }, { status: 401 })
     }
-    if (session.user.role !== 'admin') {
-      return Response.json({ error: 'Admin access required' }, { status: 403 })
-    }
 
     const { id } = await params
     if (!id) {
