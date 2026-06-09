@@ -1,5 +1,5 @@
 import { getUser } from '@/lib/session'
-import { getSessionDetails, type SessionEvent } from '@/lib/clickhouse'
+import { getSessionDetails, getSessionSource, type SessionEvent } from '@/lib/clickhouse'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Clock, DollarSign, Hash, Zap, User, Bot, Wrench, Terminal } from 'lucide-react'
@@ -44,6 +44,13 @@ function formatNum(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return n.toLocaleString()
+}
+
+// Copilot/Codex report input_tokens including cache_read; subtract it to get the
+// real (non-cached) input — Claude already reports them separately.
+function realInput(ev: SessionEvent, cacheInclusive: boolean): number {
+  const input = Number(ev.input_tokens)
+  return cacheInclusive ? Math.max(0, input - Number(ev.cache_read_tokens)) : input
 }
 
 // ── Event name helpers (support both prefixed and bare names) ───────────────
@@ -131,12 +138,12 @@ function groupIntoTurns(events: SessionEvent[]): SessionStructure {
 
 // ── Components ──────────────────────────────────────────────────────────────
 
-function SummaryCards({ events, startedAt, endedAt }: {
-  events: SessionEvent[], startedAt: string, endedAt: string
+function SummaryCards({ events, startedAt, endedAt, cacheInclusive }: {
+  events: SessionEvent[], startedAt: string, endedAt: string, cacheInclusive: boolean
 }) {
   const apiEvents = events.filter(e => isApiRequestEvent(e.event_name))
   const totalCost = apiEvents.reduce((s, e) => s + Number(e.cost_usd), 0)
-  const totalInput = apiEvents.reduce((s, e) => s + Number(e.input_tokens), 0)
+  const totalInput = apiEvents.reduce((s, e) => s + realInput(e, cacheInclusive), 0)
   const totalOutput = apiEvents.reduce((s, e) => s + Number(e.output_tokens), 0)
   const totalCache = apiEvents.reduce((s, e) => s + Number(e.cache_read_tokens), 0)
   const userTurns = events.filter(e => isUserPromptEvent(e.event_name) || (isApiRequestEvent(e.event_name) && e.prompt_id)).length
@@ -167,12 +174,12 @@ function SummaryCards({ events, startedAt, endedAt }: {
   )
 }
 
-function ModelBreakdown({ events }: { events: SessionEvent[] }) {
+function ModelBreakdown({ events, cacheInclusive }: { events: SessionEvent[], cacheInclusive: boolean }) {
   const byModel: Record<string, { input: number; output: number; cache: number; cost: number; count: number }> = {}
   for (const e of events.filter(e => isApiRequestEvent(e.event_name))) {
     if (!e.model) continue
     if (!byModel[e.model]) byModel[e.model] = { input: 0, output: 0, cache: 0, cost: 0, count: 0 }
-    byModel[e.model].input += Number(e.input_tokens)
+    byModel[e.model].input += realInput(e, cacheInclusive)
     byModel[e.model].output += Number(e.output_tokens)
     byModel[e.model].cache += Number(e.cache_read_tokens)
     byModel[e.model].cost += Number(e.cost_usd)
@@ -251,7 +258,7 @@ const QUERY_SOURCE_LABEL: Record<string, string> = {
   repl_main_thread: 'main', away_summary: 'away', background: 'bg',
 }
 
-function TurnCard({ turn }: { turn: Turn }) {
+function TurnCard({ turn, cacheInclusive }: { turn: Turn, cacheInclusive: boolean }) {
   const totalCost = turn.apiRequests.reduce((s, e) => s + Number(e.cost_usd), 0)
   const totalOutput = turn.apiRequests.reduce((s, e) => s + Number(e.output_tokens), 0)
 
@@ -309,7 +316,7 @@ function TurnCard({ turn }: { turn: Turn }) {
               )}
             </div>
             <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">
-              {Number(req.input_tokens) > 0 && <span>↑ {formatNum(Number(req.input_tokens))} in</span>}
+              {realInput(req, cacheInclusive) > 0 && <span>↑ {formatNum(realInput(req, cacheInclusive))} in</span>}
               {Number(req.output_tokens) > 0 && <span>↓ {formatNum(Number(req.output_tokens))} out</span>}
               {Number(req.cache_read_tokens) > 0 && (
                 <span className="text-sky-600">⚡ {formatNum(Number(req.cache_read_tokens))} cached</span>
@@ -362,7 +369,7 @@ function TurnCard({ turn }: { turn: Turn }) {
 }
 
 /** Flat event list — fallback for sessions with no prompt.id grouping (old format, opencode pre-shim) */
-function FlatEventList({ events }: { events: SessionEvent[] }) {
+function FlatEventList({ events, cacheInclusive }: { events: SessionEvent[], cacheInclusive: boolean }) {
   // Priority: api_request, user_prompt, session_start, compaction first
   // Fallback: show all non-empty events (e.g. opencode internal events) so the page is never blank
   const priority = events.filter(e =>
@@ -398,9 +405,9 @@ function FlatEventList({ events }: { events: SessionEvent[] }) {
                   <span className="text-xs font-medium">{ev.event_name}</span>
                   {ev.model && <span className="font-mono text-xs bg-muted px-1 rounded">{ev.model}</span>}
                 </div>
-                {(Number(ev.input_tokens) > 0 || Number(ev.output_tokens) > 0) && (
+                {(realInput(ev, cacheInclusive) > 0 || Number(ev.output_tokens) > 0) && (
                   <div className="text-xs text-muted-foreground flex gap-2">
-                    <span>↑ {formatNum(Number(ev.input_tokens))}</span>
+                    <span>↑ {formatNum(realInput(ev, cacheInclusive))}</span>
                     <span>↓ {formatNum(Number(ev.output_tokens))}</span>
                   </div>
                 )}
@@ -449,6 +456,10 @@ export default async function SessionDetailPage({ params, searchParams }: Sessio
   const { turns, hasNoTurns } = groupIntoTurns(events)
   const compactionCount = events.filter(e => isCompactionEvent(e.event_name)).length
 
+  // Copilot/Codex report input including cache_read; flag so the UI shows real input.
+  const source = await getSessionSource(sessionId)
+  const cacheInclusive = source === 'copilot' || source === 'codex'
+
   // Actual session owner (not the logged-in viewer) from event attributes
   const sessionEmail =
     events.find(e => e.attributes?.['user.email'])?.attributes['user.email'] ||
@@ -481,8 +492,8 @@ export default async function SessionDetailPage({ params, searchParams }: Sessio
         </div>
       </div>
 
-      <SummaryCards events={events} startedAt={startedAt} endedAt={endedAt} />
-      <ModelBreakdown events={events} />
+      <SummaryCards events={events} startedAt={startedAt} endedAt={endedAt} cacheInclusive={cacheInclusive} />
+      <ModelBreakdown events={events} cacheInclusive={cacheInclusive} />
       {!hasNoTurns && <CommandSummary turns={turns} />}
       <SessionAiAnalysis sessionId={sessionId} viewUser={viewUser} />
 
@@ -494,11 +505,11 @@ export default async function SessionDetailPage({ params, searchParams }: Sessio
 
       {hasNoTurns ? (
         // Fallback for sessions without prompt.id (old format or opencode pre-shim)
-        <FlatEventList events={events} />
+        <FlatEventList events={events} cacheInclusive={cacheInclusive} />
       ) : (
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">Conversation Turns</h2>
-          {turns.map(turn => <TurnCard key={turn.promptId} turn={turn} />)}
+          {turns.map(turn => <TurnCard key={turn.promptId} turn={turn} cacheInclusive={cacheInclusive} />)}
         </div>
       )}
     </div>
