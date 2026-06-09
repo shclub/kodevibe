@@ -199,7 +199,12 @@ async function _getSessionsToday(
         ${INPUT_TOKENS_EXPR} as input_tokens,
         sum(toInt64OrZero(LogAttributes['output_tokens'])) as output_tokens,
         if(any(ServiceName) ILIKE 'copilot%',
-           toInt64(countIf(Body = 'copilot.chat_request')),
+           if(any(ScopeName) = 'kodevibe-copilot',
+              -- VS Code extension: one premium request per chat turn
+              toInt64(countIf(Body = 'copilot.chat_request')),
+              -- Copilot CLI: real per-model credit cost emitted on session.shutdown
+              toInt64(sumIf(toInt64OrZero(LogAttributes['premium_requests']), LogAttributes['prompt.id'] = 'shutdown'))
+           ),
            max(toInt64OrZero(LogAttributes['premium_requests']))
         ) as premium_requests,
         multiIf(
@@ -208,7 +213,11 @@ async function _getSessionsToday(
           any(ServiceName) ILIKE 'copilot%', 'copilot',
           'claude'
         ) as source,
-        if(any(ServiceName) ILIKE 'copilot%', 'vscode', 'cli') as tool,
+        multiIf(
+          any(ScopeName) = 'kodevibe-copilot', 'vscode',
+          any(ServiceName) ILIKE 'copilot%', 'cli',
+          'cli'
+        ) as tool,
         coalesce(
           nullIf(anyIf(LogAttributes['user.email'], LogAttributes['user.email'] != ''), ''),
           nullIf(anyIf(ResourceAttributes['zeude.user.email'], ResourceAttributes['zeude.user.email'] != ''), ''),
